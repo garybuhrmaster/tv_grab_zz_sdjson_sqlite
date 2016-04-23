@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2016/04/23 - 1.1 - Minor update for improved(?) category ordering
 # 2016/04/01 - 1.0 - First release
 #
 
@@ -1220,19 +1221,19 @@ $w->startTag('tv',
               }
           }
 
-        # XMLTV categories are somewhat arbitrary.  We collect both the
-        # showTypes, genres, and entityType as categories.
-        if (defined($programDetails->{'showType'}))
-          {
-            $w->dataElement('category', $programDetails->{'showType'});
-          }
-
+        # XMLTV categories are somewhat arbitrary.  We collect the
+        # genres, showType, and entityType as categories.
         if (defined($programDetails->{'genres'}))
           {
             foreach my $genre(@{$programDetails->{'genres'}})
               {
                 $w->dataElement('category', $genre);
               }
+          }
+
+        if (defined($programDetails->{'showType'}))
+          {
+            $w->dataElement('category', $programDetails->{'showType'});
           }
 
         if (defined($programDetails->{'entityType'}))
