@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2016/05/21 - 1.7 - protect against bad json returned by server
 # 2016/05/21 - 1.6 - correct (mis)use of global variable in package
 # 2016/05/20 - 1.5 - minor output formatting improvements for xmltv_ns
 # 2016/05/19 - 1.4 - correct totalEpisodes output
@@ -95,7 +96,7 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;             # RFC2838 compliant station ids, which makes XMLTV
                                                 # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_na_sd,v 1.6 2016/05/21 00:26:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_na_sd,v 1.7 2016/05/21 01:06:00 gtb Exp ed $';
 my $SCRIPT_DESC                = 'North America Schedules Direct XMLTV grabber';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_na_sd';
 my $SCRIPT_NAME                = basename("$0");
@@ -5239,7 +5240,7 @@ sub deleteMessage
         return $return;
       }
 
-    my $r = $self->{'_JSON'}->decode($responseContent);
+    my $r = eval { $self->{'_JSON'}->decode($responseContent) };
 
     if (!defined($r))
       {
@@ -5334,7 +5335,7 @@ sub addLineup
       {
         if (defined($responseContent))
           {
-            my $r = $self->{'_JSON'}->decode($responseContent);
+            my $r = eval { $self->{'_JSON'}->decode($responseContent) };
             if (defined($r))
               {
                 $self->_setError($r->{'code'}) if (defined($r->{'code'}));
@@ -5386,7 +5387,7 @@ sub addLineup
         return $return;
       }
 
-    my $r = $self->{'_JSON'}->decode($responseContent);
+    my $r = eval { $self->{'_JSON'}->decode($responseContent) };
 
     if (!defined($r))
       {
@@ -5504,7 +5505,7 @@ sub deleteLineup
         return $return;
       }
 
-    my $r = $self->{'_JSON'}->decode($responseContent);
+    my $r = eval { $self->{'_JSON'}->decode($responseContent) };
 
     if (!defined($r))
       {
@@ -5589,7 +5590,7 @@ sub obtainLineups
         # We will convert this to an empty array (no lineups)
         if (defined($responseContent))
           {
-            my $r = $self->{'_JSON'}->decode($responseContent);
+            my $r = eval { $self->{'_JSON'}->decode($responseContent) };
             if (defined($r) && defined($r->{'code'}) && ($r->{'code'} == 4102))
               {
                 $return = {};
@@ -5642,7 +5643,7 @@ sub obtainLineups
         return $return;
       }
 
-    my $r = $self->{'_JSON'}->decode($responseContent);
+    my $r = eval { $self->{'_JSON'}->decode($responseContent) };
 
     if (!defined($r))
       {
@@ -5741,7 +5742,7 @@ sub obtainLineupMaps
         return $return;
       }
 
-    my $r = $self->{'_JSON'}->decode($responseContent);
+    my $r = eval { $self->{'_JSON'}->decode($responseContent) };
 
     if (!defined($r))
       {
@@ -5827,7 +5828,7 @@ sub obtainHeadends
       {
         # (bug?) Rather than returning an empty array, SD returns error
         # we will convert this to an empty array
-        my $r = $self->{'_JSON'}->decode($responseContent);
+        my $r = eval { $self->{'_JSON'}->decode($responseContent) };
         if (defined($r))
           {
             my $code = $r->{'code'};
@@ -5883,7 +5884,7 @@ sub obtainHeadends
         return $return;
       }
 
-    my $r = $self->{'_JSON'}->decode($responseContent);
+    my $r = eval { $self->{'_JSON'}->decode($responseContent) };
 
     if (!defined($r))
       {
@@ -5981,7 +5982,7 @@ sub obtainPrograms
         return $return;
       }
 
-    my $r = $self->{'_JSON'}->convert_blessed->decode($responseContent);
+    my $r = eval { $self->{'_JSON'}->convert_blessed->decode($responseContent) };
 
     if (!defined($r))
       {
@@ -6080,7 +6081,7 @@ sub obtainStationsSchedules
         return $return;
       }
 
-    my $r = $self->{'_JSON'}->convert_blessed->decode($responseContent);
+    my $r = eval { $self->{'_JSON'}->convert_blessed->decode($responseContent) };
 
     if (!defined($r))
       {
@@ -6171,7 +6172,7 @@ sub obtainStationsSchedulesHash
         return $return;
       }
 
-    my $r = $self->{'_JSON'}->convert_blessed->decode($responseContent);
+    my $r = eval { $self->{'_JSON'}->convert_blessed->decode($responseContent) };
 
     if (!defined($r))
       {
@@ -6265,7 +6266,7 @@ sub obtainAvailable
         return $return;
       }
 
-    my $r = $self->{'_JSON'}->convert_blessed->decode($responseContent);
+    my $r = eval { $self->{'_JSON'}->convert_blessed->decode($responseContent) };
 
     if (!defined($r))
       {
@@ -6357,7 +6358,7 @@ sub obtainStatus
         return $return;
       }
 
-    my $r = $self->{'_JSON'}->decode($responseContent);
+    my $r = eval { $self->{'_JSON'}->decode($responseContent) };
 
     if (!defined($r))
       {
@@ -6487,7 +6488,7 @@ sub obtainToken
             return $return;
           }
 
-        my $r = $self->{'_JSON'}->decode($responseContent);
+        my $r = eval { $self->{'_JSON'}->decode($responseContent) };
 
         if (!defined($r))
           {
@@ -6553,7 +6554,7 @@ sub obtainToken
         return $return;
       }
 
-    my $r = $self->{'_JSON'}->decode($responseContent);
+    my $r = eval { $self->{'_JSON'}->decode($responseContent) };
 
     if (!defined($r))
       {
