@@ -4321,7 +4321,7 @@ sub mapTransport
 
     my $transportTypeMap =                 # Map for Schedules Direct transport to XMLTV type
       {
-        'DVB-C'          => 'STB',         # DVB-C (most use a STB?)
+        'DVB-C'          => 'DTV',         # DVB-C
         'DVB-T'          => 'DTV',         # DVB-T
         'DVB-S'          => 'DTV',         # DVB-S (should be STB?)
         'Cable'          => 'STB',         # Cable (most use a STB?)
