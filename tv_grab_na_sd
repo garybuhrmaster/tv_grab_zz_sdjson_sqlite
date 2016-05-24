@@ -2280,11 +2280,17 @@ sub getLineup
                         }
                     }
 
-                  if ($SDtype eq 'DVB-T')
+                  if (($SDtype eq 'DVB-T') || ($SDtype eq 'DVB-S') | ($SDtype eq 'DVB-C'))
                     {
                       $w->startTag('dvb-channel');
-                        my $networkID = $c->{'networkID'} || 0;
-                        if (looks_like_number($networkID))
+                        my $freq = $c->{'frequencyHz'};
+                        if (defined($freq) && looks_like_number($freq))
+                          {
+                            $freq = 0 + $freq;
+                            $w->dataElement('frequency', $freq);
+                          }
+                        my $networkID = $c->{'networkID'};
+                        if (defined($networkID) && looks_like_number($networkID))
                           {
                             $networkID = 0 + $networkID;
                             $w->dataElement('original-network-id', $networkID);
@@ -2295,27 +2301,19 @@ sub getLineup
                             $transportID = 0 + $transportID;
                             $w->dataElement('transport-id', $transportID);
                           }
-                        my $serviceID = $c->{'serviceID'} || 0;
-                        if (looks_like_number($serviceID))
+                        my $serviceID = $c->{'serviceID'};
+                        if (defined($serviceID) && looks_like_number($serviceID))
                           {
                             $serviceID = 0 + $serviceID;
                             $w->dataElement('service-id', $serviceID);
                           }
-                        if (defined($c->{'channel'}) && looks_like_number($c->{'channel'}))
+                        my $lcn = $c->{'channel'};
+                        if (defined($lcn) && looks_like_number($lcn))
                           {
-                            my $preset = $c->{'channel'};
-                            $preset = 0 + $preset;
-                            $w->dataElement('lcn', $preset);
+                            $lcn = 0 + $lcn;
+                            $w->dataElement('lcn', $lcn);
                           }
                       $w->endTag('dvb-channel');
-                    }
-
-                  if ($SDtype eq 'DVB-S')
-                    {
-                    }
-
-                  if ($SDtype eq 'DVB-C')
-                    {
                     }
 
               $w->endTag('lineup-entry');
