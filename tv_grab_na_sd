@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2016/05/24 - 1.8 - retry limit updates and get-lineup improvements
 # 2016/05/21 - 1.7 - protect against bad json returned by server
 # 2016/05/21 - 1.6 - correct (mis)use of global variable in package
 # 2016/05/20 - 1.5 - minor output formatting improvements for xmltv_ns
@@ -97,7 +98,7 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;             # RFC2838 compliant station ids, which makes XMLTV
                                                 # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_na_sd,v 1.7 2016/05/21 01:06:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_na_sd,v 1.8 2016/05/24 21:06:00 gtb Exp ed $';
 my $SCRIPT_DESC                = 'North America Schedules Direct XMLTV grabber';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_na_sd';
 my $SCRIPT_NAME                = basename("$0");
