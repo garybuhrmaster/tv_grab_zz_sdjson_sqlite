@@ -87,6 +87,7 @@ use DateTime::Format::ISO8601;
 use DateTime::Format::SQLite;
 use POSIX qw(strftime);
 use List::MoreUtils qw(natatime);
+use List::Util qw/min max/;
 use DBI;
 use DBI qw(:sql_types);
 use DBD::SQLite;
@@ -488,7 +489,7 @@ else
 # not have current information based on hash values and
 # feed to our DB
 #
-for (my $retry = 0; $retry < 4; $retry++)
+for (my $retry = 0; $retry < 7; $retry++)
   {
 
     my $downloadQueued = 0;
@@ -553,7 +554,7 @@ for (my $retry = 0; $retry < 4; $retry++)
 
     print (STDERR "   downloading " . scalar(@{$stationsSchedulesList}) . " new, updated, or missing daily schedules" . (($retry == 0) ? "" : " (retry $retry)") . "\n") if (!$quiet);
 
-    sleep(10 * $retry);
+    sleep(min(30, (10 * $retry)));
 
     $sql1 = "delete from schedules where station = ? and day = ?";
     $sql2 = "replace into schedules (station, day, starttime, duration, program, program_hash, details) values (?, ?, ?, ?, ?, ?, ?)";
@@ -699,7 +700,7 @@ for (my $retry = 0; $retry < 4; $retry++)
 # and feed to our DB
 #
 
-for (my $retry = 0; $retry < 4; $retry++)
+for (my $retry = 0; $retry < 7; $retry++)
   {
 
     my $downloadQueued = 0;
@@ -762,7 +763,7 @@ for (my $retry = 0; $retry < 4; $retry++)
 
     print (STDERR "   downloading " . scalar(@{$programsList}) . " new, updated, or missing programs" . (($retry == 0) ? "" : " (retry $retry)") . "\n") if (!$quiet);
 
-    sleep(10 * $retry);
+    sleep(min(30, (10 * $retry)));
 
     $sql1 = "replace into programs (program, hash, details) values (?, ?, ?)";
 
