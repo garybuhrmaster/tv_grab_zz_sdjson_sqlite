@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2016/05/25 - 1.9 - Support total seasons, and more robust validation
 # 2016/05/24 - 1.8 - retry limit updates and get-lineup improvements
 # 2016/05/21 - 1.7 - protect against bad json returned by server
 # 2016/05/21 - 1.6 - correct (mis)use of global variable in package
@@ -98,7 +99,7 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;             # RFC2838 compliant station ids, which makes XMLTV
                                                 # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_na_sd,v 1.8 2016/05/24 21:06:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_na_sd,v 1.9 2016/05/25 15:55:00 gtb Exp ed $';
 my $SCRIPT_DESC                = 'North America Schedules Direct XMLTV grabber';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_na_sd';
 my $SCRIPT_NAME                = basename("$0");
@@ -1294,12 +1295,15 @@ $w->startTag('tv',
                 if (defined($meta->{'Gracenote'}))
                   {
                     my $season = $meta->{'Gracenote'}->{'season'};
+                    my $totalSeasons = $meta->{'Gracenote'}->{'totalSeasons'} || '';
                     my $episode = $meta->{'Gracenote'}->{'episode'} || '';
-                    my $total = $meta->{'Gracenote'}->{'totalEpisodes'} || '';
+                    my $totalEpisodes = $meta->{'Gracenote'}->{'totalEpisodes'} || '';
                     next if (!looks_like_number($season));
                     $season = $season - 1;
+                    $season = '' if ($season < 0);
+                    $season = "$season / $totalSeasons" if ($totalSeasons ne '');
                     $episode = $episode - 1 if looks_like_number($episode);
-                    $episode = "$episode / $total" if ($total ne '');
+                    $episode = "$episode / $totalEpisodes" if ($totalEpisodes ne '');
                     $w->dataElement('episode-num', " $season . $episode . ", 'system' => 'xmltv_ns');
                   }
               }
