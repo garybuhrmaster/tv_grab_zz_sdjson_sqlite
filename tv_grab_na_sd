@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2016/05/26 - 1.11 - use program duration as length
 # 2016/05/26 - 1.10 - hack for tv_find_grabbers source parsing of desc
 # 2016/05/25 - 1.9 - Support total seasons, and more robust validation
 # 2016/05/24 - 1.8 - retry limit updates and get-lineup improvements
@@ -100,7 +101,7 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;             # RFC2838 compliant station ids, which makes XMLTV
                                                 # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_na_sd,v 1.10 2016/05/26 16:17:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_na_sd,v 1.11 2016/05/26 22:18:00 gtb Exp ed $';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_na_sd';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
@@ -1270,9 +1271,9 @@ $w->startTag('tv',
               }
           }
 
-        if (defined($programDetails->{'movie'}->{'duration'}))
+        if (defined($programDetails->{'duration'}))
           {
-            $w->dataElement('length', $programDetails->{'movie'}->{'duration'}, 'units' => 'seconds');
+            $w->dataElement('length', $programDetails->{'duration'}, 'units' => 'seconds');
           }
 
         if (defined($programDetails->{'officialURL'}))
