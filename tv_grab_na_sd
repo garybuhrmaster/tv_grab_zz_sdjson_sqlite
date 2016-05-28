@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2016/05/28 - 1.12 - add support for episodeImage
 # 2016/05/26 - 1.11 - use program duration as length
 # 2016/05/26 - 1.10 - hack for tv_find_grabbers source parsing of desc
 # 2016/05/25 - 1.9 - Support total seasons, and more robust validation
@@ -101,7 +102,7 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;             # RFC2838 compliant station ids, which makes XMLTV
                                                 # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_na_sd,v 1.11 2016/05/26 22:18:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_na_sd,v 1.12 2016/05/28 17:21:00 gtb Exp ed $';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_na_sd';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
@@ -1274,6 +1275,23 @@ $w->startTag('tv',
         if (defined($programDetails->{'duration'}))
           {
             $w->dataElement('length', $programDetails->{'duration'}, 'units' => 'seconds');
+          }
+
+        if (defined($programDetails->{'episodeImage'}) &&
+            defined($programDetails->{'episodeImage'}->{'uri'}))
+          {
+            my $url = $SD->uriResolve($programDetails->{'episodeImage'}->{'uri'}, '/image');
+            if (defined($programDetails->{'episodeImage'}->{'width'}) &&
+                defined($programDetails->{'episodeImage'}->{'height'}))
+              {
+                $w->emptyTag('icon', 'src' => $url,
+                                  'width' => $programDetails->{'episodeImage'}->{'width'},
+                                  'height' => $programDetails->{'episodeImage'}->{'height'});
+              }
+            else
+              {
+                $w->emptyTag('icon', 'src' => $url);
+              }
           }
 
         if (defined($programDetails->{'officialURL'}))
@@ -4825,6 +4843,7 @@ package SchedulesDirect v20141201.0.0;
 # obtainPrograms               - return program data for programs
 # obtainAvailable              - return available counties/satellites
 # deleteMessage                - delete message
+# uriResolve                   - convert uri to absolute
 #
 
 require 5.016;
@@ -4837,6 +4856,7 @@ no warnings 'once';
 
 use Carp;
 use Digest::SHA1 qw(sha1 sha1_hex sha1_base64);
+use URI;
 use URI::Escape;
 use Compress::Zlib;
 use HTTP::Request;
@@ -5158,6 +5178,32 @@ sub PasswordHash
 
     $return = $self->{'PasswordHash'};
     
+    print (STDERR "DEBUG: Returning from " . (caller(0))[3] . " with: \n" . Data::Dumper->new([$return])->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
+
+    return $return;
+  }
+
+#
+# Resolve a possible relative uri to absolute URL
+#
+sub uriResolve
+  {
+    my $self = shift;
+
+    print (STDERR "DEBUG: Entering " . (caller(0))[3] . " with args: \n" . Data::Dumper->new(\@_)->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
+
+    my $uri = shift;
+
+    my $path = shift || '';
+
+    my $return;
+
+    # strip off leading /
+    # add trailing / if needed
+    #$rel = '/' . $rel . '/' if (defined($rel) && ($rel ne ''));
+
+    $return = URI->new_abs( $uri, "$self->{'RESTUrl'}" . $path . "/" )->as_string();
+
     print (STDERR "DEBUG: Returning from " . (caller(0))[3] . " with: \n" . Data::Dumper->new([$return])->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
 
     return $return;
