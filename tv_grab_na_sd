@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2016/06/07 - 1.13 - improved season/episode value checks
 # 2016/05/28 - 1.12 - add support for episodeImage
 # 2016/05/26 - 1.11 - use program duration as length
 # 2016/05/26 - 1.10 - hack for tv_find_grabbers source parsing of desc
@@ -102,7 +103,7 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;             # RFC2838 compliant station ids, which makes XMLTV
                                                 # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_na_sd,v 1.12 2016/05/28 17:21:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_na_sd,v 1.13 2016/06/07 16:01:00 gtb Exp ed $';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_na_sd';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
@@ -1314,14 +1315,19 @@ $w->startTag('tv',
                 if (defined($meta->{'Gracenote'}))
                   {
                     my $season = $meta->{'Gracenote'}->{'season'};
-                    my $totalSeasons = $meta->{'Gracenote'}->{'totalSeasons'} || '';
-                    my $episode = $meta->{'Gracenote'}->{'episode'} || '';
-                    my $totalEpisodes = $meta->{'Gracenote'}->{'totalEpisodes'} || '';
-                    next if (!looks_like_number($season));
+                    my $totalSeasons = $meta->{'Gracenote'}->{'totalSeasons'};
+                    my $episode = $meta->{'Gracenote'}->{'episode'};
+                    my $totalEpisodes = $meta->{'Gracenote'}->{'totalEpisodes'};
+                    next if (!defined($season));
+                    $season = '0' if (!looks_like_number($season));
+                    $totalSeasons = '' if (!looks_like_number($totalSeasons));
+                    $episode = '0' if (!looks_like_number($episode));
+                    $totalEpisodes = '' if (!looks_like_number($totalEpisodes));
                     $season = $season - 1;
                     $season = '' if ($season < 0);
                     $season = "$season / $totalSeasons" if ($totalSeasons ne '');
-                    $episode = $episode - 1 if looks_like_number($episode);
+                    $episode = $episode - 1;
+                    $episode = '' if ($episode < 0);
                     $episode = "$episode / $totalEpisodes" if ($totalEpisodes ne '');
                     $w->dataElement('episode-num', " $season . $episode . ", 'system' => 'xmltv_ns');
                   }
