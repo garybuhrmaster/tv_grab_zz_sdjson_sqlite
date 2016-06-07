@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2016/06/07 - 1.14 - support multipart episodes
 # 2016/06/07 - 1.13 - improved season/episode value checks
 # 2016/05/28 - 1.12 - add support for episodeImage
 # 2016/05/26 - 1.11 - use program duration as length
@@ -103,7 +104,7 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;             # RFC2838 compliant station ids, which makes XMLTV
                                                 # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_na_sd,v 1.13 2016/06/07 16:01:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_na_sd,v 1.14 2016/06/07 23:26:00 gtb Exp ed $';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_na_sd';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
@@ -1307,6 +1308,9 @@ $w->startTag('tv',
              $w->dataElement('episode-num', $prodid, 'system' => 'dd_progid' );
           }
 
+        my $season = '';
+        my $episode = '';
+        my $part = '';
         if (defined($programDetails->{'metadata'}))
           {
             foreach my $meta(@{$programDetails->{'metadata'}})
@@ -1314,9 +1318,9 @@ $w->startTag('tv',
                 # We only support Gracenote season/episode metadata
                 if (defined($meta->{'Gracenote'}))
                   {
-                    my $season = $meta->{'Gracenote'}->{'season'};
+                    $season = $meta->{'Gracenote'}->{'season'};
                     my $totalSeasons = $meta->{'Gracenote'}->{'totalSeasons'};
-                    my $episode = $meta->{'Gracenote'}->{'episode'};
+                    $episode = $meta->{'Gracenote'}->{'episode'};
                     my $totalEpisodes = $meta->{'Gracenote'}->{'totalEpisodes'};
                     next if (!defined($season));
                     $season = '0' if (!looks_like_number($season));
@@ -1329,9 +1333,23 @@ $w->startTag('tv',
                     $episode = $episode - 1;
                     $episode = '' if ($episode < 0);
                     $episode = "$episode / $totalEpisodes" if ($totalEpisodes ne '');
-                    $w->dataElement('episode-num', " $season . $episode . ", 'system' => 'xmltv_ns');
+                    last;
                   }
               }
+          }
+        if (defined($scheduleDetails->{'multipart'}))
+          {
+            $part = $scheduleDetails->{'multipart'}->{'partNumber'};
+            my $totalParts = $scheduleDetails->{'multipart'}->{'totalParts'};
+            $part = 0 if (!looks_like_number($part));
+            $part = $part - 1;
+            $part = '' if ($part < 0);
+            $totalParts = '' if (!looks_like_number($totalParts));
+            $part = "$part / $totalParts" if ($totalParts ne '');
+          }
+        if (($season ne '') || ($episode ne '') || ($part ne ''))
+          {
+            $w->dataElement('episode-num', " $season . $episode . $part ", 'system' => 'xmltv_ns');
           }
 
         if (defined($scheduleDetails->{'videoProperties'}))
