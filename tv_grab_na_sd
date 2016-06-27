@@ -4920,7 +4920,9 @@ sub new
     $self->{'_LWP'}->timing('1,2,5,10,20,20,20,20,20,20');
     $self->{'_LWP'}->default_header('Accept-Encoding' => scalar HTTP::Message::decodable(),
                                     'Accept' => 'application/json',
-                                    'Content_Type' => 'application/json');
+                                    'Content_Type' => 'application/json',
+                                    'Pragma' => 'no-cache',
+                                    'Cache-Control' => 'no-cache');
 
     bless($self, $class);
     return $self;
