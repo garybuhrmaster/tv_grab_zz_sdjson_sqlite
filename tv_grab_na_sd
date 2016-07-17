@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2016/07/17 - 1.15 - use Digest::SHA rather than Digest::SHA1
 # 2016/06/07 - 1.14 - support multipart episodes
 # 2016/06/07 - 1.13 - improved season/episode value checks
 # 2016/05/28 - 1.12 - add support for episodeImage
@@ -83,7 +84,7 @@ use XMLTV::Ask;
 use XML::Writer;
 use Encode qw/decode encode/;
 use JSON;
-use Digest::SHA1 qw(sha1 sha1_hex sha1_base64);
+use Digest::SHA qw(sha1 sha1_hex sha1_base64);
 use File::Basename;
 use File::Which;
 use File::HomeDir;
@@ -104,7 +105,7 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;             # RFC2838 compliant station ids, which makes XMLTV
                                                 # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_na_sd,v 1.14 2016/06/07 23:26:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_na_sd,v 1.15 2016/07/17 16:03:00 gtb Exp ed $';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_na_sd';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
@@ -4879,7 +4880,7 @@ use warnings NONFATAL => qw(exec recursion internal malloc newline experimental 
 no warnings 'once';
 
 use Carp;
-use Digest::SHA1 qw(sha1 sha1_hex sha1_base64);
+use Digest::SHA qw(sha1 sha1_hex sha1_base64);
 use URI;
 use URI::Escape;
 use Compress::Zlib;
