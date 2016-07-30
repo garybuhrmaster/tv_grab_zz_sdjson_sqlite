@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2016/07/30 - 1.16 - eliminate XML:Writer validation for performance
 # 2016/07/17 - 1.15 - use Digest::SHA rather than Digest::SHA1
 # 2016/06/07 - 1.14 - support multipart episodes
 # 2016/06/07 - 1.13 - improved season/episode value checks
@@ -105,7 +106,7 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;             # RFC2838 compliant station ids, which makes XMLTV
                                                 # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_na_sd,v 1.15 2016/07/17 16:03:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_na_sd,v 1.16 2016/07/30 15:58:00 gtb Exp ed $';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_na_sd';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
@@ -998,7 +999,8 @@ my $crewMap =
  
 my $w = XML::Writer->new( 'ENCODING' => 'UTF-8',
                           'DATA_MODE' => 1,
-                          'DATA_INDENT' => 1 );
+                          'DATA_INDENT' => 1,
+                          'UNSAFE' => (!$debug) );
 
 $w->xmlDecl('UTF-8');
 $w->comment($SD_COMMENT);
