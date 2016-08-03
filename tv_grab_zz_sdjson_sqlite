@@ -44,7 +44,8 @@
 #
 # Version history:
 #
-# 2016/08/93 - 1.18 - rename grabber based on xmltv agreed convention
+# 2016/08/03 - 1.19 - reflect multinational capability (and fix docs)
+# 2016/08/03 - 1.18 - rename grabber based on xmltv agreed convention
 # 2016/07/30 - 1.17 - don't report radio stations as tvshow category
 # 2016/07/30 - 1.16 - eliminate XML:Writer validation for performance
 # 2016/07/17 - 1.15 - use Digest::SHA rather than Digest::SHA1
@@ -108,7 +109,7 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;             # RFC2838 compliant station ids, which makes XMLTV
                                                 # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.18 2016/08/03 15:25:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.19 2016/08/03 16:02:00 gtb Exp ed $';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_zz_sdjson_sqlite';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
@@ -157,7 +158,7 @@ my $conf;
       load_old_config_sub => \&loadOldConfig,
       preferredmethod => 'allatonce',
       version => "$SCRIPT_VERSION",
-      description => 'North America Schedules Direct XMLTV grabber',
+      description => 'Multinational (Schedules Direct JSON web services with SQLite DB)',
       extra_options => [qw/manage-lineups force-download download-only no-download passwordhash=s/],
       defaults => { days => 30 },
     } 
@@ -4615,9 +4616,11 @@ tv_grab_zz_sdjson_sqlite --get-lineup [--config-file FILE]
 =head1 DESCRIPTION
 
 Output TV listings in XMLTV format for many locations available in
-North America (US/CA).  The data come from
-L<http://www.schedulesdirect.org> and an account must be created
-on the Schedules Direct site in order to grab data.
+North America (US/CA) and other selected countries internationally.
+The data comes from L<http://www.schedulesdirect.org> and an account
+must be created on the Schedules Direct site in order to grab data.
+Refer to the Schedules Direct site for signup requirements and
+supported locations.
 
 This grabber uses a shared local database which allows for
 downloading only new/changed/updated information, and in
@@ -4626,11 +4629,12 @@ substantially reduce the download times (as some data such
 as schedules and program details are commonly shared between
 sources in the same location).
 
-First, you must run B<tv_grab_zz_sdjson_sqlite --manage-lineups> to manage
-the lineups available to your grabber configuration.
+First, you must run B<tv_grab_zz_sdjson_sqlite --manage-lineups>
+to manage the lineups available to your grabber configuration
+at the Schedules Direct service.
 
-Second, you must run B<tv_grab_zz_sdjson_sqlite --configure> to choose
-which lineup this configuration will grab (this grabber
+Second, you must run B<tv_grab_zz_sdjson_sqlite --configure> to
+choose which lineup this configuration will grab (this grabber
 will share the downloaded information for multiple lineups,
 and can substantially reduce the royal overheads in those
 cases).
@@ -4651,8 +4655,8 @@ configuration file.  Note that one must run --manage-lineups
 first to create and initialize the database and configure lineups.
 
 B<--config-file FILE> Set the name of the configuration file, the
-default is B<~/.xmltv/tv_grab_zz_sdjson_sqlite.conf>.  This is the file written by
-B<--configure> and read when grabbing.
+default is B<~/.xmltv/tv_grab_zz_sdjson_sqlite.conf>.  This is
+the file written by B<--configure> and read when grabbing.
 
 B<--output FILE> When grabbing, write output to FILE rather than
 standard output.
@@ -4708,8 +4712,8 @@ B<--info> Print a help page and exit.
 1.
 First you must signup for an account at Schedules Direct.
 This is a paid service providing EPG data for North America
-(and some other) locations.  See L<http://www.schedulesdirect.org>
-for signup requirements.
+and other selected countries.  See L<http://www.schedulesdirect.org>
+for signup requirements, and the countries served.
 
 2.
 Second you need to configure the lineups that you will have
