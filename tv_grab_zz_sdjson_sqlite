@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2016/08/24 - 1.20 - correct sql error reporting
 # 2016/08/03 - 1.19 - reflect multinational capability (and fix docs)
 # 2016/08/03 - 1.18 - rename grabber based on xmltv agreed convention
 # 2016/07/30 - 1.17 - don't report radio stations as tvshow category
@@ -109,7 +110,7 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;             # RFC2838 compliant station ids, which makes XMLTV
                                                 # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.19 2016/08/03 16:02:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.20 2016/08/24 19:10:00 gtb Exp ed $';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_zz_sdjson_sqlite';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
@@ -572,21 +573,21 @@ for (my $retry = 0; $retry < 7; $retry++)
     $sql3 = "replace into schedules_hash (station, day, hash) values (?, ?, ?)";
 
     $sth1 = $DBH->prepare_cached($sql1);
-    if (!defined($sth))
+    if (!defined($sth1))
       {
         print (STDERR "Unexpected error when preparing statement ($sql1): " . $DBH->errstr . "\n");
         exit(1);
       }
     $sth2 = $DBH->prepare_cached($sql2);
-    if (!defined($sth))
+    if (!defined($sth2))
       {
         print (STDERR "Unexpected error when preparing statement ($sql2): " . $DBH->errstr . "\n");
         exit(1);
       }
     $sth3 = $DBH->prepare_cached($sql3);
-    if (!defined($sth))
+    if (!defined($sth3))
       {
-        print (STDERR "Unexpected error when preparing statement ($sql2): " . $DBH->errstr . "\n");
+        print (STDERR "Unexpected error when preparing statement ($sql3): " . $DBH->errstr . "\n");
         exit(1);
       }
 
@@ -663,7 +664,7 @@ for (my $retry = 0; $retry < 7; $retry++)
             $sth1->execute();
             if ($sth1->err)
               {
-                print (STDERR "Unexpected error when executing statement ($sql): " . $sth1->errstr . "\n");
+                print (STDERR "Unexpected error when executing statement ($sql1): " . $sth1->errstr . "\n");
                  exit(1);
               }
             foreach my $program(@{$programs})
@@ -683,7 +684,7 @@ for (my $retry = 0; $retry < 7; $retry++)
                 $sth2->execute();
                 if ($sth2->err)
                   {
-                    print (STDERR "Unexpected error when executing statement ($sql): " . $sth2->errstr . "\n");
+                    print (STDERR "Unexpected error when executing statement ($sql2): " . $sth2->errstr . "\n");
                     exit(1);
                   }
               }
@@ -693,7 +694,7 @@ for (my $retry = 0; $retry < 7; $retry++)
             $sth3->execute();
             if ($sth3->err)
               {
-                print (STDERR "Unexpected error when executing statement ($sql): " . $sth3->errstr . "\n");
+                print (STDERR "Unexpected error when executing statement ($sql3): " . $sth3->errstr . "\n");
                  exit(1);
               }
           }
@@ -843,7 +844,7 @@ for (my $retry = 0; $retry < 7; $retry++)
             $sth1->execute();
             if ($sth1->err)
               {
-                print (STDERR "Unexpected error when executing statement ($sql): " . $sth1->errstr . "\n");
+                print (STDERR "Unexpected error when executing statement ($sql1): " . $sth1->errstr . "\n");
                 exit(1);
               }
           }
@@ -2684,7 +2685,7 @@ sub SD_downloadLineups
       }
     $sql1 = "update lineups set name = ?, location = ?, transport = ?, details = ? where lineup = ?";
     $sth1 = $DBH->prepare_cached($sql1);
-    if (!defined($sth))
+    if (!defined($sth1))
       {
         print (STDERR "Unexpected error when preparing statement ($sql1): " . $DBH->errstr . "\n");
         exit(1);
@@ -2717,7 +2718,7 @@ sub SD_downloadLineups
         $sth1->execute();
         if ($sth1->err)
           {
-            print (STDERR "Unexpected error when executing statement ($sql): " . $sth1->errstr . "\n");
+            print (STDERR "Unexpected error when executing statement ($sql1): " . $sth1->errstr . "\n");
             exit(1);
           }
       }
