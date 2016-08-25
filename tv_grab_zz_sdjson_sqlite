@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2016/08/25 - 1.21 - additional error checking of SD data
 # 2016/08/24 - 1.20 - correct sql error reporting
 # 2016/08/03 - 1.19 - reflect multinational capability (and fix docs)
 # 2016/08/03 - 1.18 - rename grabber based on xmltv agreed convention
@@ -110,7 +111,7 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;             # RFC2838 compliant station ids, which makes XMLTV
                                                 # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.20 2016/08/24 19:10:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.21 2016/08/25 03:19:00 gtb Exp ed $';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_zz_sdjson_sqlite';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
@@ -670,10 +671,16 @@ for (my $retry = 0; $retry < 7; $retry++)
             foreach my $program(@{$programs})
               {
                 my $pID = $program->{'programID'};
-                my $starttime = DateTime::Format::ISO8601->parse_datetime($program->{'airDateTime'});
+                my $airDateTime = $program->{'airDateTime'};
                 my $duration = $program->{'duration'};
                 my $phash = $program->{'md5'};
                 my $details = $JSON->utf8->encode($program);
+                if ((!defined($duration)) || (!defined($phash)) || (!defined($pID)) || (!defined($airDateTime)))
+                  {
+                    print (STDERR "Program in schedule for $sID on " . $meta->{'startDate'} . " is malformed, skipping\n");
+                    next;
+                  }
+                my $starttime = DateTime::Format::ISO8601->parse_datetime($airDateTime);
                 $sth2->bind_param( 1, $sID, SQL_VARCHAR );
                 $sth2->bind_param( 2, DateTime::Format::SQLite->format_date($dayDateTime), SQL_DATE );
                 $sth2->bind_param( 3, DateTime::Format::SQLite->format_datetime($starttime), SQL_DATETIME );
