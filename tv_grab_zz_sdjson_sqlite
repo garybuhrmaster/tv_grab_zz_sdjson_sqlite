@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2016/09/10 - 1.23 - remove use warning nonfatal experimental decl
 # 2016/08/25 - 1.22 - no warning messages for malformed SD data if quiet
 # 2016/08/25 - 1.21 - additional error checking of SD data
 # 2016/08/24 - 1.20 - correct sql error reporting
@@ -76,7 +77,7 @@ use feature ':5.16';
 
 use strict;
 use warnings FATAL => 'all';
-use warnings NONFATAL => qw(exec recursion internal malloc newline experimental deprecated portable);
+use warnings NONFATAL => qw(exec recursion internal malloc newline deprecated portable);
 no warnings 'once';
 
 use utf8;
@@ -112,7 +113,7 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;             # RFC2838 compliant station ids, which makes XMLTV
                                                 # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.22 2016/08/25 17:59:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.23 2016/09/10 11:57:00 gtb Exp ed $';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_zz_sdjson_sqlite';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
