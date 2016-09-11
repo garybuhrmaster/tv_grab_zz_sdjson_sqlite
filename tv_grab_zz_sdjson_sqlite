@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2016/09/10 - 1.24 - change (improve) cast mapping
 # 2016/09/10 - 1.23 - remove use warning nonfatal experimental decl
 # 2016/08/25 - 1.22 - no warning messages for malformed SD data if quiet
 # 2016/08/25 - 1.21 - additional error checking of SD data
@@ -113,7 +114,7 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;             # RFC2838 compliant station ids, which makes XMLTV
                                                 # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.23 2016/09/10 11:57:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.24 2016/09/10 13:41:00 gtb Exp ed $';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_zz_sdjson_sqlite';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
@@ -893,8 +894,8 @@ print (STDERR "Processing data and creating XMLTV output\n") if (!$quiet);
 my $castMap =
   {
     'Actor'                            => 'actor',
-    'Guest Star'                       => 'actor',
-    'Guest Voice'                      => 'actor',
+    'Guest Star'                       => 'guest',
+    'Guest Voice'                      => 'guest',
     'Voice'                            => 'actor',
     'Correspondent'                    => 'guest',
     'Contestant'                       => 'guest',
