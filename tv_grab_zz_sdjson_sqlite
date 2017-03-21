@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2017/03/21 - 1.25 - fix trailing whitespace
 # 2016/09/10 - 1.24 - change (improve) cast mapping
 # 2016/09/10 - 1.23 - remove use warning nonfatal experimental decl
 # 2016/08/25 - 1.22 - no warning messages for malformed SD data if quiet
@@ -114,7 +115,7 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;             # RFC2838 compliant station ids, which makes XMLTV
                                                 # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.24 2016/09/10 13:41:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.25 2017/03/21 13:45:00 gtb Exp ed $';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_zz_sdjson_sqlite';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
@@ -153,7 +154,7 @@ my $conf;
 
 ( $opt, $conf ) = ParseOptions
   (
-    { 
+    {
       grabber_name => "$SCRIPT_NAME",
       capabilities => [qw/baseline manualconfig preferredmethod lineups apiconfig/],
       stage_sub => \&configureGrabber,
@@ -166,7 +167,7 @@ my $conf;
       description => 'Multinational (Schedules Direct JSON web services with SQLite DB)',
       extra_options => [qw/manage-lineups force-download download-only no-download passwordhash=s/],
       defaults => { days => 30 },
-    } 
+    }
   );
 
 
@@ -268,7 +269,7 @@ if (!$download)
   }
 
 #
-# Login and perform the usual checks 
+# Login and perform the usual checks
 #
 print (STDERR "Obtaining authentication token for Schedules Direct\n") if (!$quiet);
 
@@ -751,7 +752,7 @@ for (my $retry = 0; $retry < 7; $retry++)
 
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
-      { 
+      {
         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
         exit(1);
       }
@@ -763,7 +764,7 @@ for (my $retry = 0; $retry < 7; $retry++)
     $sth->execute();
 
     if ($sth->err)
-      { 
+      {
         print (STDERR "Unexpected error when executing statement ($sql): " . $sth->errstr . "\n");
         exit(1);
       }
@@ -837,7 +838,7 @@ for (my $retry = 0; $retry < 7; $retry++)
           {
             my $pID = $program->{'programID'};
             next if (!defined($pID));
-            my $hash = $program->{'md5'} || 0; 
+            my $hash = $program->{'md5'} || 0;
             my $code = $program->{'code'} || 0;
             if ($code != 0)
               {
@@ -1010,7 +1011,7 @@ my $crewMap =
     'Original Music'                   => 'composer',
     'Original Music and Songs'         => 'composer'
   };
- 
+
 my $w = XML::Writer->new( 'ENCODING' => 'UTF-8',
                           'DATA_MODE' => 1,
                           'DATA_INDENT' => 1,
@@ -1225,7 +1226,7 @@ $w->startTag('tv',
             $w->dataElement('date', $programDetails->{'movie'}->{'year'});
           }
 
-        if (defined($conf->{'mythtv-categories'}->[0]) && 
+        if (defined($conf->{'mythtv-categories'}->[0]) &&
             ($conf->{'mythtv-categories'}->[0] eq 'enabled'))
           {
             # For MythTV, we need to specify the first category
@@ -1459,7 +1460,7 @@ $w->startTag('tv',
         if (defined($scheduleDetails->{'premiere'}))
           {
             my $premiere = $scheduleDetails->{'premiere'};
-            $w->emptyTag('premiere') if ($premiere); 
+            $w->emptyTag('premiere') if ($premiere);
           }
         elsif (defined($scheduleDetails->{'isPremiereOrFinale'}))
           {
@@ -1617,7 +1618,7 @@ sub configureGrabber
 
     my $result;
 
-    my $writer = new XMLTV::Configure::Writer( 
+    my $writer = new XMLTV::Configure::Writer(
                      OUTPUT => \$result,
                      grabber => $SCRIPT_NAME,
                      encoding => 'iso-8859-1' );
@@ -1688,11 +1689,11 @@ sub configureGrabber
         $writer->start_selectone
           (
             {
-              id => 'lineup',      
+              id => 'lineup',
               title => [ [ 'Schedules Direct Lineup', 'en' ] ],
-              description => 
+              description =>
                 [ [
-                    'Select the lineup associated with this configuration', 
+                    'Select the lineup associated with this configuration',
                     'en'
                 ] ],
             }
@@ -1830,7 +1831,7 @@ sub listChannels
         lineupValidate($conf->{'lineup'}->[0]);
       }
 
-    my $w = XML::Writer->new( 'ENCODING' => 'UTF-8', 
+    my $w = XML::Writer->new( 'ENCODING' => 'UTF-8',
                               'DATA_MODE' => 1,
                               'DATA_INDENT' => 1,
                               'OUTPUT' => 'self' );
@@ -2281,7 +2282,7 @@ sub getLineup
 
                   if (defined($s->{'logo'}->{'URL'}))
                     {
-                      if (defined($s->{'logo'}->{'width'}) && defined($s->{'logo'}->{'height'})) 
+                      if (defined($s->{'logo'}->{'width'}) && defined($s->{'logo'}->{'height'}))
                         {
                           $w->emptyTag('logo', 'url' => $s->{'logo'}->{'URL'},
                                                'height' => $s->{'logo'}->{'height'},
@@ -2442,52 +2443,52 @@ sub SD_login
   {
     my $username = DB_settingsGet('username');
     my $passwordhash = $passwordHash || DB_settingsGet('passwordhash');
-    
+
     if ((!defined($username)) || (!defined($passwordhash)))
-      {     
+      {
         print (STDERR "Your database is not configured to access the Schedules Direct service\n");
         print (STDERR "(the username or the password hash is not available in the settings table)\n");
         print (STDERR "Please re-run $SCRIPT_NAME --manage-lineups and then $SCRIPT_NAME --configure\n");
         exit(1);
-      } 
-    
+      }
+
     if (!defined($SD->obtainToken($username, undef, $passwordhash)))
-      {     
+      {
         print (STDERR "Unable to authenticate to Schedules Direct: " . $SD->ErrorString() . "\n");
         exit(1);
-      } 
-    
+      }
+
     if (!defined($SD->obtainStatus()))
       {
         print (STDERR "Unable to obtain Schedules Direct server status: " . $SD->ErrorString() . "\n");
         exit(1);
-      }   
+      }
 
     my $online = $SD->isOnline;
     if (!defined($online))
-      {   
+      {
         print (STDERR "Unable to obtain Schedules Direct server online status: " . $SD->ErrorString() . "\n");
         exit(1);
-      }   
-    
+      }
+
     if (!$online)
-      { 
+      {
         print (STDERR "The Schedules Direct service is not currently online,  Try again later.\n");
         exit(1);
-      }     
-      
+      }
+
     my $expiry = $SD->accountExpiry;
-    
+
     if (!defined($expiry))
-      {   
+      {
         print (STDERR "Unable to obtain Schedules Direct account expiration: " . $SD->ErrorString() . "\n");
         exit(1);
       }
 
     my $expiryDateTime = DateTime::Format::ISO8601->parse_datetime($expiry);
-    
+
     if ($nowDateTime > $expiryDateTime)
-      { 
+      {
         print (STDERR "Schedules Direct account expired on " . $expiryDateTime . "\n");
         exit(1);
       }
@@ -2529,12 +2530,12 @@ sub SD_isLineupFetchRequired
         for my $l (@{$accountStatus->{'lineups'}})
           {
             if (defined($l->{'lineup'}) && ($l->{'lineup'} eq $lineup))
-              { 
+              {
                 $accountLineupModifiedDateTime = DateTime::Format::ISO8601->parse_datetime($l->{'modified'});
                 last;
               }
             if (defined($l->{'ID'}) && ($l->{'ID'} eq $lineup))
-              { 
+              {
                 $accountLineupModifiedDateTime = DateTime::Format::ISO8601->parse_datetime($l->{'modified'});
                 last;
               }
@@ -2549,7 +2550,7 @@ sub SD_isLineupFetchRequired
 
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
-      { 
+      {
         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
         exit(1);
       }
@@ -3007,42 +3008,42 @@ sub lineupValidate
     my ($lineup) = @_;
 
     my $sql = "select lineup, name, transport, location, details from lineups where lineup = ?";
-      
+
     my $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
        {
          print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
-         exit(1); 
-       }    
-      
+         exit(1);
+       }
+
     $sth->bind_param( 1, $lineup, SQL_VARCHAR );
-    
+
     $sth->execute();
-      
+
     if ($sth->err())
-      {     
+      {
         print (STDERR "Unexpected error when executing statement ($sql): " . $sth->errstr . "\n");
         exit(1)
-      } 
+      }
 
     $sth->bind_col(1, undef, SQL_VARCHAR );
     $sth->bind_col(2, undef, SQL_VARCHAR );
     $sth->bind_col(3, undef, SQL_VARCHAR );
     $sth->bind_col(4, undef, SQL_VARCHAR );
     $sth->bind_col(5, undef, SQL_VARCHAR );
-    
+
     my $llu = $sth->fetchrow_arrayref();
-        
+
     $sth->finish();
 
     if (!defined($llu))
-      { 
+      {
         print (STDERR "Lineup $lineup is no longer configured at Schedules Direct\n");
         print (STDERR "Please run $SCRIPT_NAME --manage-lineups to manage your Schedules Direct lineups\n");
         print (STDERR "and/or $SCRIPT_NAME --configure to change the configured lineup\n");
         exit(1);
-      }   
-    
+      }
+
     my $lineupDeleted = $JSON->utf8->decode($llu->[4])->{'isDeleted'};
 
     if (defined($lineupDeleted) && $lineupDeleted)
@@ -3114,7 +3115,7 @@ sub askChoice
       {
         push @optionsvalue, @{$option}[0];
         push @optionstext, @{$option}[1];
-      } 
+      }
 
     if (!defined($default))
       {
@@ -3190,7 +3191,7 @@ sub DB_open
       }
 
     $DBH = DBI->connect("DBI:SQLite:dbname=$dbname", "", "",
-                        { RaiseError => 0, PrintError => 0, AutoCommit => 0 }); 
+                        { RaiseError => 0, PrintError => 0, AutoCommit => 0 });
 
     if (!defined($DBH))
       {
@@ -3513,7 +3514,7 @@ sub DB_prune
     $sth->bind_param( 1, DateTime::Format::SQLite->format_datetime($nowDateTime), SQL_DATETIME );
     $sth->execute();
     if ($sth->err)
-      { 
+      {
         print (STDERR "Unable to update lineups with downloaded dates in the future in database: " . $sth->errstr . "\n");
       }
 
@@ -3542,7 +3543,7 @@ sub DB_prune
        }
     $sth->execute();
     if ($sth->err)
-      { 
+      {
         print (STDERR "Unable to prune channels no longer in our lineups in database: " . $sth->errstr . "\n");
       }
 
@@ -3556,7 +3557,7 @@ sub DB_prune
        }
     $sth->execute();
     if ($sth->err)
-      { 
+      {
         print (STDERR "Unable to prune stations no longer in our channels in database: " . $sth->errstr . "\n");
       }
 
@@ -3570,7 +3571,7 @@ sub DB_prune
        }
     $sth->execute();
     if ($sth->err)
-      { 
+      {
         print (STDERR "Unable to prune schedules no longer associated with stations in database: " . $sth->errstr . "\n");
       }
 
@@ -3600,7 +3601,7 @@ sub DB_prune
        }
     $sth->execute();
     if ($sth->err)
-      { 
+      {
         print (STDERR "Unable to prune schedules_hash not associated with a station in database: " . $sth->errstr . "\n");
       }
 
@@ -3614,7 +3615,7 @@ sub DB_prune
        }
     $sth->bind_param( 1, DateTime::Format::SQLite->format_date($expireBeforeDateTime), SQL_DATE );
     $sth->bind_param( 2, DateTime::Format::SQLite->format_date($expireAfterDateTime), SQL_DATE );
-    $sth->execute(); 
+    $sth->execute();
     if ($sth->err)
       {
         print (STDERR "Unable to prune schedules_hash for past and far future dates in database: " . $sth->errstr . "\n");
@@ -3630,7 +3631,7 @@ sub DB_prune
        }
     $sth->execute();
     if ($sth->err)
-      { 
+      {
         print (STDERR "Unable to prune schedules_hash which have no matching schedule in database: " . $sth->errstr . "\n");
       }
 
@@ -3644,7 +3645,7 @@ sub DB_prune
        }
     $sth->execute();
     if ($sth->err)
-      { 
+      {
         print (STDERR "Unable to prune schedules for unmatched schedule hashes in database: " . $sth->errstr . "\n");
       }
 
@@ -3658,7 +3659,7 @@ sub DB_prune
        }
     $sth->execute();
     if ($sth->err)
-      { 
+      {
         print (STDERR "Unable to prune stations_schedules_hash in database: " . $sth->errstr . "\n");
       }
 
@@ -3672,9 +3673,9 @@ sub DB_prune
        }
     $sth->bind_param( 1, DateTime::Format::SQLite->format_date($expireBeforeDateTime), SQL_DATE );
     $sth->bind_param( 2, DateTime::Format::SQLite->format_date($expireAfterDateTime), SQL_DATE );
-    $sth->execute(); 
+    $sth->execute();
     if ($sth->err)
-      { 
+      {
         print (STDERR "Unable to prune stations_schedules_hash for past and far future dates in database: " . $sth->errstr . "\n");
       }
 
@@ -3688,7 +3689,7 @@ sub DB_prune
        }
     $sth->execute();
     if ($sth->err)
-      { 
+      {
         print (STDERR "Unable to prune programs no longer referenced in database: " . $sth->errstr . "\n");
       }
 
@@ -3762,14 +3763,14 @@ sub DB_clean
 #     {
 #       print (STDERR "Unable to delete lineups in database: " . $DBH->errstr . "\n");
 #       exit(1);
-#     } 
+#     }
 #   $sql = "delete from channels";
 #   $rc = $DBH->do($sql);
 #   if ((!defined($rc)) || ($rc < 0))
 #     {
 #       print (STDERR "Unable to delete channels in database: " . $DBH->errstr . "\n");
 #       exit(1);
-#     } 
+#     }
 #   $sql = "delete from stations";
 #   $rc = $DBH->do($sql);
 #   if ((!defined($rc)) || ($rc < 0))
@@ -3783,7 +3784,7 @@ sub DB_clean
       {
         print (STDERR "Unable to update lineups in database: " . $DBH->errstr . "\n");
         exit(1);
-      } 
+      }
     $sql = "delete from stations_schedules_hash";
     $rc = $DBH->do($sql);
     if ((!defined($rc)) || ($rc < 0))
@@ -3888,7 +3889,7 @@ sub manageLineups
       {
         my $lu = $SD->obtainLineups();
         if (!defined($lu))
-          { 
+          {
             print (STDERR "Fatal error obtaining lineups: " . $SD->ErrorString() . "\n");
             print (STDERR "Please re-run $SCRIPT_NAME --manage-lineups and/or $SCRIPT_NAME --configure\n");
             exit(1);
@@ -3906,12 +3907,12 @@ sub manageLineups
         $prompt .= "Lineup ID            Description\n";
         $prompt .= "======================================================================\n";
         for my $l (@{$lineups})
-          { 
-            my $desc = "$l->{'name'} ($l->{'transport'} $l->{'location'})"; 
+          {
+            my $desc = "$l->{'name'} ($l->{'transport'} $l->{'location'})";
             $prompt .= sprintf("%-20s %s\n", $l->{'lineup'}, $desc);
           }
 
-        $prompt .= "Specify a Schedules Direct account lineup management action"; 
+        $prompt .= "Specify a Schedules Direct account lineup management action";
 
         @choices = ( [ 'Exit',                  'Exit lineup management'] ,
                      [ 'Add',                   'Add an additional lineup to your account' ],
@@ -3973,7 +3974,7 @@ sub manageLineups
             my $postal_code_example = @{$clist}[$cindex]->{'postalCodeExample'};
             my $postal_code_required = 1;
             $postal_code_required = !(@{$clist}[$cindex]->{'onePostalCode'}) if (defined(@{$clist}[$cindex]->{'onePostalCode'}));
-            
+
             my $postal_code = '';
 
             if ($postal_code_required)
@@ -4073,8 +4074,8 @@ sub manageLineups
                 push (@choices, [ $l->{'lineup'}, sprintf("%-20s %s", $l->{'lineup'}, $desc) ]);;
               }
 
-            my $lineup_to_delete = askChoice("\nLineup to delete (ctrl-D to skip)", undef, @choices); 
-            next if (!defined($lineup_to_delete)); 
+            my $lineup_to_delete = askChoice("\nLineup to delete (ctrl-D to skip)", undef, @choices);
+            next if (!defined($lineup_to_delete));
 
             if ($SD->deleteLineup($lineup_to_delete))
               {
@@ -4153,7 +4154,7 @@ sub manageLineups
             my $prompt = '';
             @choices = ();
             for my $l (@{$lineups})
-              { 
+              {
                 my $desc = "$l->{'name'} ($l->{'transport'} $l->{'location'})";
                 push (@choices, [ $l->{'lineup'}, sprintf("%-20s %s", $l->{'lineup'}, $desc) ]);;
               }
@@ -4514,7 +4515,7 @@ sub mapUSATSCChannelToFrequency
 
     $channel =~ s/^\s+|\s+$//g;                # Remove any leading/trailing spaces
 
-    if ($channel =~ m/^\d+$/)                  
+    if ($channel =~ m/^\d+$/)
       {
         $channel = 0 + $channel;
       }
@@ -4522,7 +4523,7 @@ sub mapUSATSCChannelToFrequency
     my $frequency;
 
     my $USATSCFrequenciesMap =                 # US ATSC frequencies
-      { 
+      {
          2 =>   57000000,
          3 =>   63000000,
          4 =>   69000000,
@@ -4572,7 +4573,7 @@ sub mapUSATSCChannelToFrequency
         48 =>  677000000,
         49 =>  683000000,
         50 =>  689000000,
-        51 =>  695000000 
+        51 =>  695000000
       };
 
     $frequency = $USATSCFrequenciesMap->{$channel} || '0';
@@ -4594,7 +4595,7 @@ tv_grab_zz_sdjson_sqlite - Grab TV and radio program listings from Schedules Dir
 tv_grab_zz_sdjson_sqlite --help
 
 tv_grab_zz_sdjson_sqlite --info
-  
+
 tv_grab_zz_sdjson_sqlite --version
 
 tv_grab_zz_sdjson_sqlite --capabilities
@@ -4938,7 +4939,7 @@ sub new
     my $self = {@_};
     $self->{'Username'} = undef unless $self->{'Username'};
     $self->{'PasswordHash'} = undef unless $self->{'PasswordHash'};
-    $self->{'PasswordHash'} = sha1_hex($self->{'Password'}) if defined($self->{'Password'}); 
+    $self->{'PasswordHash'} = sha1_hex($self->{'Password'}) if defined($self->{'Password'});
     delete $self->{'Password'};
     $self->{'UserAgent'} = 'tv_grab_zz_sdjson_sqlite' unless $self->{'UserAgent'};
     $self->{'Debug'} = 0 unless $self->{'Debug'};
@@ -5094,7 +5095,7 @@ sub Error
     $return = $self->{'_Error'};
 
     print (STDERR "DEBUG: Returning from " . (caller(0))[3] . " with: \n" . Data::Dumper->new([$return])->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
- 
+
     return $return;
   }
 
@@ -5210,14 +5211,14 @@ sub Password
     my $return;
 
     if (@_)
-      { 
+      {
         my $p = shift;
         $self->{'PasswordHash'} = sha1_hex($p);
         $self->_resetSession;
       }
-    
+
     $return = $self->{'PasswordHash'};
-    
+
     print (STDERR "DEBUG: Returning from " . (caller(0))[3] . " with: \n" . Data::Dumper->new([$return])->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
 
     return $return;
@@ -5241,7 +5242,7 @@ sub PasswordHash
       }
 
     $return = $self->{'PasswordHash'};
-    
+
     print (STDERR "DEBUG: Returning from " . (caller(0))[3] . " with: \n" . Data::Dumper->new([$return])->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
 
     return $return;
@@ -5425,7 +5426,7 @@ sub addLineup
             return $return;
           }
         $return = 0;
-        $self->_setErrorString("Schedules Direct web services is not online"); 
+        $self->_setErrorString("Schedules Direct web services is not online");
         $self->_CroakOrCarp;
         print (STDERR "DEBUG: Returning from " . (caller(0))[3] . " with: \n" . Data::Dumper->new([$return])->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
         return $return;
@@ -5644,7 +5645,7 @@ sub deleteLineup
     if ($code != 0)
       {
         $return = 0;
-        $self->_setError($code);       
+        $self->_setError($code);
         $self->_setErrorString("Delete request failed, code: $code, message: $msg");
         $self->_CroakOrCarp;
         print (STDERR "DEBUG: Returning from " . (caller(0))[3] . " with: \n" . Data::Dumper->new([$return])->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
@@ -5678,7 +5679,7 @@ sub obtainLineups
             return $return;
           }
         $return = undef;
-        $self->_setErrorString("Schedules Direct web services is not online"); 
+        $self->_setErrorString("Schedules Direct web services is not online");
         $self->_CroakOrCarp;
         print (STDERR "DEBUG: Returning from " . (caller(0))[3] . " with: \n" . Data::Dumper->new([$return])->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
         return $return;
@@ -5797,7 +5798,7 @@ sub obtainLineupMaps
         $self->_CroakOrCarp;
         print (STDERR "DEBUG: Returning from " . (caller(0))[3] . " with: \n" . Data::Dumper->new([$return])->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
         return $return;
-      } 
+      }
 
     if (!$self->isOnline)
       {
@@ -5808,7 +5809,7 @@ sub obtainLineupMaps
             return $return;
           }
         $return = undef;
-        $self->_setErrorString("Schedules Direct web services is not online"); 
+        $self->_setErrorString("Schedules Direct web services is not online");
         $self->_CroakOrCarp;
         print (STDERR "DEBUG: Returning from " . (caller(0))[3] . " with: \n" . Data::Dumper->new([$return])->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
         return $return;
@@ -5915,7 +5916,7 @@ sub obtainHeadends
             return $return;
           }
         $return = undef;
-        $self->_setErrorString("Schedules Direct web services is not online"); 
+        $self->_setErrorString("Schedules Direct web services is not online");
         $self->_CroakOrCarp;
         print (STDERR "DEBUG: Returning from " . (caller(0))[3] . " with: \n" . Data::Dumper->new([$return])->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
         return $return;
@@ -6329,7 +6330,7 @@ sub obtainAvailable
 
           }
         $return = undef;
-        $self->_setErrorString("Schedules Direct web services is not online"); 
+        $self->_setErrorString("Schedules Direct web services is not online");
         $self->_CroakOrCarp;
         print (STDERR "DEBUG: Returning from " . (caller(0))[3] . " with: \n" . Data::Dumper->new([$return])->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
         return $return;
@@ -6440,7 +6441,7 @@ sub obtainStatus
     my $response = $self->{'_LWP'}->request($request);
 
     print (STDERR "DEBUG:   HTTP response:\n" . Data::Dumper->new([$response])->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
- 
+
     my $responseCode = $response->code();
     my $responseContent = $response->decoded_content();
 
@@ -6559,7 +6560,7 @@ sub obtainToken
     if (defined($self->{'_Token'}) && ($self->{'_TokenAcquired'} > ($now - 43200)))
       {
         print (STDERR "DEBUG:   (re)using current token\n") if ($self->{'Debug'});
-        $return = $self->{'_Token'}; 
+        $return = $self->{'_Token'};
         print (STDERR "DEBUG: Returning from " . (caller(0))[3] . " with: \n" . Data::Dumper->new([$return])->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
         return $return;
       }
