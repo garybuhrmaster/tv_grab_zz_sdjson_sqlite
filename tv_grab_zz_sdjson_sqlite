@@ -2,7 +2,7 @@
 #
 # tv_grab_zz_sdjson_sqlite
 #
-# Copyright (c) 2016 Gary Buhrmaster <gary.buhrmaster@gmail.com>
+# Copyright (c) 2016, 2017 Gary Buhrmaster <gary.buhrmaster@gmail.com>
 #
 # This code is distributed under the GNU General Public License v2 (GPLv2)
 #
@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2017/03/26 - 1.27 - misc. code cleanup
 # 2017/03/21 - 1.26 - fix sth typos
 # 2017/03/21 - 1.25 - fix trailing whitespace
 # 2016/09/10 - 1.24 - change (improve) cast mapping
@@ -116,7 +117,7 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;             # RFC2838 compliant station ids, which makes XMLTV
                                                 # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.26 2017/03/21 14:00:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.27 2017/03/26 23:13:00 gtb Exp ed $';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_zz_sdjson_sqlite';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
@@ -137,7 +138,7 @@ my $SD_PROGRAM_CHUNK           = 4000;         # Request program data in chunk s
 
 my $JSON                       = JSON->new()->shrink(1)->utf8(1);
 
-my $SD = new SchedulesDirect();
+my $SD = SchedulesDirect->new();
 
 my $DBH;                                       # DataBase Handle
 
@@ -409,7 +410,7 @@ else
         exit(1)
       }
 
-    $sth->bind_col(1, undef, SQL_VARCHAR );
+    $sth->bind_col( 1, undef, SQL_VARCHAR );
 
     my $stationsSchedulesHashList = $sth->fetchall_arrayref([0]);
 
@@ -554,8 +555,8 @@ for (my $retry = 0; $retry < 7; $retry++)
         exit(1);
       }
 
-    $sth->bind_col(1, undef, SQL_VARCHAR );
-    $sth->bind_col(2, undef, SQL_DATE );
+    $sth->bind_col( 1, undef, SQL_VARCHAR );
+    $sth->bind_col( 2, undef, SQL_DATE );
 
     my $stationsSchedulesList = $sth->fetchall_arrayref();
 
@@ -623,7 +624,6 @@ for (my $retry = 0; $retry < 7; $retry++)
             print (STDERR "Unexpected error when obtaining station schedules: " . $SD->ErrorString() . " (will retry)\n") if (!$quiet);
             $downloadQueued = 1;
             next;
-            exit(1);
           }
 
         if (ref($r) ne 'ARRAY')
@@ -634,7 +634,6 @@ for (my $retry = 0; $retry < 7; $retry++)
             print (STDERR "Unexpected error when obtaining station schedules: " . $SD->ErrorString() . " (will retry)\n") if (!$quiet);
             $downloadQueued = 1;
             next;
-            exit(1);
           }
 
         foreach my $sched(@{$r})
@@ -770,7 +769,7 @@ for (my $retry = 0; $retry < 7; $retry++)
         exit(1);
       }
 
-    $sth->bind_col(1, undef, SQL_VARCHAR );
+    $sth->bind_col( 1, undef, SQL_VARCHAR );
 
     my $programsList = $sth->fetchall_arrayref([0]);
 
@@ -821,7 +820,6 @@ for (my $retry = 0; $retry < 7; $retry++)
             print (STDERR "Unexpected error when obtaining programs: " . $SD->ErrorString() . " (will retry)\n") if (!$quiet);
             $downloadQueued = 1;
             next;
-            exit(1);
           }
 
         if (ref($r) ne 'ARRAY')
@@ -832,7 +830,6 @@ for (my $retry = 0; $retry < 7; $retry++)
             print (STDERR "Unexpected return data type " . ref($r) . " when obtaining program array (will retry)\n") if (!$quiet);
             $downloadQueued = 1;
             next;
-            exit(1);
           }
 
         foreach my $program(@{$r})
@@ -1068,15 +1065,15 @@ $w->startTag('tv',
       exit(1)
     }
 
-  $sth->bind_col(1, undef, SQL_VARCHAR );
-  $sth->bind_col(2, undef, SQL_DATETIME );
-  $sth->bind_col(3, undef, SQL_INTEGER );
-  $sth->bind_col(4, undef, SQL_VARCHAR );
-  $sth->bind_col(5, undef, SQL_VARCHAR );
-  $sth->bind_col(6, undef, SQL_VARCHAR );
-  $sth->bind_col(7, undef, SQL_VARCHAR );
-  $sth->bind_col(8, undef, SQL_VARCHAR );
-  $sth->bind_col(9, undef, SQL_VARCHAR );
+  $sth->bind_col( 1, undef, SQL_VARCHAR );
+  $sth->bind_col( 2, undef, SQL_DATETIME );
+  $sth->bind_col( 3, undef, SQL_INTEGER );
+  $sth->bind_col( 4, undef, SQL_VARCHAR );
+  $sth->bind_col( 5, undef, SQL_VARCHAR );
+  $sth->bind_col( 6, undef, SQL_VARCHAR );
+  $sth->bind_col( 7, undef, SQL_VARCHAR );
+  $sth->bind_col( 8, undef, SQL_VARCHAR );
+  $sth->bind_col( 9, undef, SQL_VARCHAR );
 
   my $programsWritten = 0;
 
@@ -1615,14 +1612,13 @@ exit(0);
 #
 sub configureGrabber
   {
-    my( $stage, $conf ) = @_;
+    my ($stage, $conf, undef) = @_;
 
     my $result;
 
-    my $writer = new XMLTV::Configure::Writer(
-                     OUTPUT => \$result,
-                     grabber => $SCRIPT_NAME,
-                     encoding => 'iso-8859-1' );
+    my $writer = XMLTV::Configure::Writer->new( OUTPUT => \$result,
+                                                grabber => $SCRIPT_NAME,
+                                                encoding => 'iso-8859-1' );
     $writer->start ( { grabber => $SCRIPT_NAME } );
 
     if ($stage eq 'start')
@@ -1669,11 +1665,11 @@ sub configureGrabber
             exit(1)
           }
 
-        $sth->bind_col(1, undef, SQL_VARCHAR );
-        $sth->bind_col(2, undef, SQL_VARCHAR );
-        $sth->bind_col(3, undef, SQL_VARCHAR );
-        $sth->bind_col(4, undef, SQL_VARCHAR );
-        $sth->bind_col(5, undef, SQL_VARCHAR );
+        $sth->bind_col( 1, undef, SQL_VARCHAR );
+        $sth->bind_col( 2, undef, SQL_VARCHAR );
+        $sth->bind_col( 3, undef, SQL_VARCHAR );
+        $sth->bind_col( 4, undef, SQL_VARCHAR );
+        $sth->bind_col( 5, undef, SQL_VARCHAR );
 
         my $lu = $sth->fetchall_arrayref();
 
@@ -1769,7 +1765,7 @@ sub configureGrabber
 #
 sub listChannels
   {
-    my ($conf, $opt) = @_;
+    my ($conf, $opt, undef) = @_;
 
     my $fetchLineupRequired;
 
@@ -1892,11 +1888,11 @@ sub channelWriter
         print (STDERR "Unexpected error when executing statement ($sql): " . $sth->errstr . "\n");
         exit(1)
       }
-    $sth->bind_col(1, undef, SQL_VARCHAR );
-    $sth->bind_col(2, undef, SQL_VARCHAR );
-    $sth->bind_col(3, undef, SQL_VARCHAR );
-    $sth->bind_col(4, undef, SQL_VARCHAR );
-    $sth->bind_col(5, undef, SQL_VARCHAR );
+    $sth->bind_col( 1, undef, SQL_VARCHAR );
+    $sth->bind_col( 2, undef, SQL_VARCHAR );
+    $sth->bind_col( 3, undef, SQL_VARCHAR );
+    $sth->bind_col( 4, undef, SQL_VARCHAR );
+    $sth->bind_col( 5, undef, SQL_VARCHAR );
     my $l = $sth->fetchrow_arrayref();
     $sth->finish();
     my $lineupTransport = 'Unknown';
@@ -1924,10 +1920,10 @@ sub channelWriter
         exit(1)
       }
 
-    $sth->bind_col(1, undef, SQL_VARCHAR );
-    $sth->bind_col(2, undef, SQL_VARCHAR );
-    $sth->bind_col(3, undef, SQL_VARCHAR );
-    $sth->bind_col(4, undef, SQL_VARCHAR );
+    $sth->bind_col( 1, undef, SQL_VARCHAR );
+    $sth->bind_col( 2, undef, SQL_VARCHAR );
+    $sth->bind_col( 3, undef, SQL_VARCHAR );
+    $sth->bind_col( 4, undef, SQL_VARCHAR );
 
     # Process each channel in our lineup
     while (my $r = $sth->fetchrow_arrayref())
@@ -1986,7 +1982,7 @@ sub channelWriter
 #
 sub listLineups
   {
-    my ($opt) = @_;
+    my ($opt, undef) = @_;
     my $conf = LoadConfig($opt->{'config-file'});
 
     configValidate($conf, $opt);
@@ -2037,11 +2033,11 @@ sub listLineups
         exit(1)
       }
 
-    $sth->bind_col(1, undef, SQL_VARCHAR );
-    $sth->bind_col(2, undef, SQL_VARCHAR );
-    $sth->bind_col(3, undef, SQL_VARCHAR );
-    $sth->bind_col(4, undef, SQL_VARCHAR );
-    $sth->bind_col(5, undef, SQL_VARCHAR );
+    $sth->bind_col( 1, undef, SQL_VARCHAR );
+    $sth->bind_col( 2, undef, SQL_VARCHAR );
+    $sth->bind_col( 3, undef, SQL_VARCHAR );
+    $sth->bind_col( 4, undef, SQL_VARCHAR );
+    $sth->bind_col( 5, undef, SQL_VARCHAR );
 
     my $lu = $sth->fetchall_arrayref();
 
@@ -2087,7 +2083,7 @@ sub listLineups
 #
 sub getLineup
   {
-    my ($conf, $opt) = @_;
+    my ($conf, $opt, undef) = @_;
 
     configValidate($conf, $opt);
 
@@ -2171,11 +2167,11 @@ sub getLineup
         exit(1)
       }
 
-    $sth->bind_col(1, undef, SQL_VARCHAR );
-    $sth->bind_col(2, undef, SQL_VARCHAR );
-    $sth->bind_col(3, undef, SQL_VARCHAR );
-    $sth->bind_col(4, undef, SQL_VARCHAR );
-    $sth->bind_col(5, undef, SQL_VARCHAR );
+    $sth->bind_col( 1, undef, SQL_VARCHAR );
+    $sth->bind_col( 2, undef, SQL_VARCHAR );
+    $sth->bind_col( 3, undef, SQL_VARCHAR );
+    $sth->bind_col( 4, undef, SQL_VARCHAR );
+    $sth->bind_col( 5, undef, SQL_VARCHAR );
 
     my $l = $sth->fetchrow_arrayref();
 
@@ -2224,9 +2220,9 @@ sub getLineup
               exit(1)
             }
 
-          $sth->bind_col(1, undef, SQL_VARCHAR );
-          $sth->bind_col(2, undef, SQL_VARCHAR );
-          $sth->bind_col(3, undef, SQL_VARCHAR );
+          $sth->bind_col( 1, undef, SQL_VARCHAR );
+          $sth->bind_col( 2, undef, SQL_VARCHAR );
+          $sth->bind_col( 3, undef, SQL_VARCHAR );
 
           while (my $r = $sth->fetchrow_arrayref())
             {
@@ -2511,7 +2507,7 @@ sub SD_login
 #
 sub SD_isLineupFetchRequired
   {
-    my ($lineup) = @_;
+    my ($lineup, undef) = @_;
 
     my $sql;
     my $sth;
@@ -2638,6 +2634,8 @@ sub SD_cleanLineups
       }
 
     $DBH->commit();
+
+    return;
   }
 
 #
@@ -2754,7 +2752,7 @@ sub SD_downloadLineups
 sub SD_downloadLineupMaps
   {
 
-    my ($lineup) = @_;
+    my ($lineup, undef) = @_;
 
     my $maps = $SD->obtainLineupMaps($lineup);
 
@@ -2789,8 +2787,8 @@ sub SD_downloadLineupMaps
       }
     $sth->bind_param( 1, $lineup, SQL_VARCHAR );
     $sth->execute();
-    $sth->bind_col(1, \$lineupChannelsSelected, SQL_INTEGER );
-    $sth->bind_col(2, \$lineupTransport, SQL_VARCHAR );
+    $sth->bind_col( 1, \$lineupChannelsSelected, SQL_INTEGER );
+    $sth->bind_col( 2, \$lineupTransport, SQL_VARCHAR );
     $sth->fetch();
     if ($sth->err)
       {
@@ -2976,8 +2974,8 @@ sub SD_downloadLineupMaps
         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
         exit(1);
       }
-    $sth->bind_param(1, DateTime::Format::SQLite->format_datetime($nowDateTime), SQL_DATETIME );
-    $sth->bind_param(2, $lineup, SQL_VARCHAR );
+    $sth->bind_param( 1, DateTime::Format::SQLite->format_datetime($nowDateTime), SQL_DATETIME );
+    $sth->bind_param( 2, $lineup, SQL_VARCHAR );
 
     $sth->execute();
     if ($sth->err)
@@ -3006,7 +3004,7 @@ sub SD_downloadLineupMaps
 #
 sub lineupValidate
   {
-    my ($lineup) = @_;
+    my ($lineup, undef) = @_;
 
     my $sql = "select lineup, name, transport, location, details from lineups where lineup = ?";
 
@@ -3027,11 +3025,11 @@ sub lineupValidate
         exit(1)
       }
 
-    $sth->bind_col(1, undef, SQL_VARCHAR );
-    $sth->bind_col(2, undef, SQL_VARCHAR );
-    $sth->bind_col(3, undef, SQL_VARCHAR );
-    $sth->bind_col(4, undef, SQL_VARCHAR );
-    $sth->bind_col(5, undef, SQL_VARCHAR );
+    $sth->bind_col( 1, undef, SQL_VARCHAR );
+    $sth->bind_col( 2, undef, SQL_VARCHAR );
+    $sth->bind_col( 3, undef, SQL_VARCHAR );
+    $sth->bind_col( 4, undef, SQL_VARCHAR );
+    $sth->bind_col( 5, undef, SQL_VARCHAR );
 
     my $llu = $sth->fetchrow_arrayref();
 
@@ -3076,7 +3074,7 @@ sub lineupValidate
 #
 sub configValidate
   {
-    my ($conf, $opt) = @_;
+    my ($conf, $opt, undef) = @_;
 
     if (!defined($conf->{'database'}->[0]))
       {
@@ -3125,7 +3123,7 @@ sub askChoice
 
     my $selection = ask_choice($prompt, $default, @optionstext);
 
-    return undef if (!defined($selection));
+    return if (!defined($selection));
 
     for ( my $i=0; $i<scalar( @optionstext ); $i++ )
       {
@@ -3135,7 +3133,7 @@ sub askChoice
           }
       }
 
-    return undef;
+    return;
   }
 
 #
@@ -3160,7 +3158,7 @@ sub askChoice
 #
 sub DB_open
   {
-    my ($dbname) = @_;
+    my ($dbname, undef) = @_;
 
     #
     # Quick exit if we already have the database open
@@ -3392,6 +3390,7 @@ sub DB_open
         ##      $DBH->commit();
         ##    }
       }
+    return;
   }
 
 #
@@ -3406,7 +3405,7 @@ sub DB_open
 #
 sub DB_settingsGet
   {
-    my ($tag) = @_;
+    my ($tag, undef) = @_;
 
     my $value;
 
@@ -3428,7 +3427,7 @@ sub DB_settingsGet
         exit(1);
       }
 
-    $sth->bind_col(1, \$value, SQL_VARCHAR );
+    $sth->bind_col( 1, \$value, SQL_VARCHAR );
 
     $sth->fetch();
 
@@ -3456,7 +3455,7 @@ sub DB_settingsGet
 #
 sub DB_settingsSet
   {
-    my ($tag, $value) = @_;
+    my ($tag, $value, undef) = @_;
 
     my $sql = "replace into settings (tag, value) values (?, ?)";
 
@@ -3480,6 +3479,8 @@ sub DB_settingsSet
       }
 
     $sth->finish();
+
+    return;
   }
 
 #
@@ -3734,6 +3735,8 @@ sub DB_prune
       }
 
     $DBH->commit();
+
+    return;
   }
 
 #
@@ -3815,6 +3818,8 @@ sub DB_clean
         exit(1);
       }
     $DBH->commit();
+
+    return;
   }
 
 #
@@ -4353,6 +4358,7 @@ sub manageLineups
               }
           }
       }
+    return;
   }
 
 #
@@ -4372,7 +4378,7 @@ sub manageLineups
 #
 sub generateRFC2838
   {
-    my ($station) = @_;
+    my ($station, undef) = @_;
     if ($RFC2838_COMPLIANT)
       {
         return (sprintf("I%s.json.schedulesdirect.org", $station));
@@ -4402,7 +4408,7 @@ sub mapTransport
 
     return 'Unknown' if (!defined($transport));
 
-    my $transportTypeMap =                 # Map for Schedules Direct transport to XMLTV type
+    state $transportTypeMap =              # Map for Schedules Direct transport to XMLTV type
       {
         'DVB-C'          => 'DTV',         # DVB-C
         'DVB-T'          => 'DTV',         # DVB-T
@@ -4445,7 +4451,7 @@ sub mapRatingAgency
     # based on the Schedules Direct rating agency names from sample data.
     # There are likely many missing country agencies.  Updates welcome.
 
-    my $bodyMap =
+    state $bodyMap =
       {
         'Australian Classification Board'                                                  => 'CB',
         'British Board of Film Classification'                                             => 'BBFC',
@@ -4512,7 +4518,7 @@ sub mapRatingAgency
 #
 sub mapUSATSCChannelToFrequency
   {
-    my ($channel) = @_;
+    my ($channel, undef) = @_;
 
     $channel =~ s/^\s+|\s+$//g;                # Remove any leading/trailing spaces
 
@@ -4523,7 +4529,7 @@ sub mapUSATSCChannelToFrequency
 
     my $frequency;
 
-    my $USATSCFrequenciesMap =                 # US ATSC frequencies
+    state $USATSCFrequenciesMap =              # US ATSC frequencies
       {
          2 =>   57000000,
          3 =>   63000000,
@@ -4852,7 +4858,7 @@ on the shoulders of those that came before us.
 
 =head1 COPYRIGHT
 
-Copyright (c) 2016 Gary Buhrmaster <gary.buhrmaster@gmail.com>
+Copyright (c) 2016, 2017 Gary Buhrmaster <gary.buhrmaster@gmail.com>
 
 This code is distributed under the GNU General Public License v2 (GPLv2)
 
@@ -4975,6 +4981,7 @@ END
 sub DESTROY
   {
     my $self = shift;
+    return;
   }
 
 #
