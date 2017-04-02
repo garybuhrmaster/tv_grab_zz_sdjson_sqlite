@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2017/04/02 - 1.28 - misc. code cleanup
 # 2017/03/26 - 1.27 - misc. code cleanup
 # 2017/03/21 - 1.26 - fix sth typos
 # 2017/03/21 - 1.25 - fix trailing whitespace
@@ -114,10 +115,10 @@ use DBD::SQLite;
 use Scalar::Util qw/looks_like_number/;
 use Data::Dumper;
 
-my $RFC2838_COMPLIANT          = 1;             # RFC2838 compliant station ids, which makes XMLTV
-                                                # validate even though the docs say "SHOULD" not "MUST"
+my $RFC2838_COMPLIANT          = 1;            # RFC2838 compliant station ids, which makes XMLTV
+                                               # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.27 2017/03/26 23:13:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.28 2017/04/02 23:31:00 gtb Exp ed $';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_zz_sdjson_sqlite';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
@@ -1042,10 +1043,10 @@ $w->startTag('tv',
 
   $sth = $DBH->prepare_cached($sql);
   if (!defined($sth))
-     {
-       print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
-       exit(1);
-     }
+    {
+      print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+      exit(1);
+    }
 
   #
   # Determine our start and end days
@@ -1877,10 +1878,10 @@ sub channelWriter
     $sql = "select lineup, name, transport, location, details from lineups where lineup = ?";
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
-       {
-         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
-         exit(1);
-       }
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+        exit(1);
+      }
     $sth->bind_param( 1, $lineup, SQL_VARCHAR );
     $sth->execute();
     if ($sth->err())
@@ -2152,10 +2153,10 @@ sub getLineup
 
     my $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
-       {
-         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
-         exit(1);
-       }
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+        exit(1);
+      }
 
     $sth->bind_param( 1, $conf->{'lineup'}->[0], SQL_VARCHAR );
 
@@ -3010,10 +3011,10 @@ sub lineupValidate
 
     my $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
-       {
-         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
-         exit(1);
-       }
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+        exit(1);
+      }
 
     $sth->bind_param( 1, $lineup, SQL_VARCHAR );
 
@@ -3509,10 +3510,10 @@ sub DB_prune
     $sql = "update lineups set downloaded = '1970-01-01 00:00:00' where downloaded > ?";
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
-       {
-         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
-         exit(1);
-       }
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+        exit(1);
+      }
     $sth->bind_param( 1, DateTime::Format::SQLite->format_datetime($nowDateTime), SQL_DATETIME );
     $sth->execute();
     if ($sth->err)
@@ -3524,10 +3525,10 @@ sub DB_prune
     $sql = "update lineups set modified = '1970-01-01 00:00:00' where modified > ?";
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
-       {
-         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
-         exit(1);
-       }
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+        exit(1);
+      }
     $sth->bind_param( 1, DateTime::Format::SQLite->format_datetime($nowDateTime), SQL_DATETIME );
     $sth->execute();
     if ($sth->err)
@@ -3539,10 +3540,10 @@ sub DB_prune
     $sql = "delete from channels where lineup not in (select distinct lineups.lineup from lineups as lineups)";
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
-       {
-         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
-         exit(1);
-       }
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+        exit(1);
+      }
     $sth->execute();
     if ($sth->err)
       {
@@ -3553,10 +3554,10 @@ sub DB_prune
     $sql = "delete from stations where station not in (select distinct channels.station from channels as channels)";
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
-       {
-         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
-         exit(1);
-       }
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+        exit(1);
+      }
     $sth->execute();
     if ($sth->err)
       {
@@ -3567,10 +3568,10 @@ sub DB_prune
     $sql = "delete from schedules where station not in (select distinct stations.station from stations as stations)";
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
-       {
-         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
-         exit(1);
-       }
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+        exit(1);
+      }
     $sth->execute();
     if ($sth->err)
       {
@@ -3581,10 +3582,10 @@ sub DB_prune
     $sql = "delete from schedules where day < ? OR day > ?";
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
-       {
-         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
-         exit(1);
-       }
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+        exit(1);
+      }
     $sth->bind_param( 1, DateTime::Format::SQLite->format_date($expireBeforeDateTime), SQL_DATE );
     $sth->bind_param( 2, DateTime::Format::SQLite->format_date($expireAfterDateTime), SQL_DATE );
     $sth->execute();
@@ -3597,10 +3598,10 @@ sub DB_prune
     $sql = "delete from schedules_hash where station not in (select distinct stations.station from stations as stations)";
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
-       {
-         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
-         exit(1);
-       }
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+        exit(1);
+      }
     $sth->execute();
     if ($sth->err)
       {
@@ -3611,10 +3612,10 @@ sub DB_prune
     $sql = "delete from schedules_hash where day < ? OR day > ?";
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
-       {
-         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
-         exit(1);
-       }
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+        exit(1);
+      }
     $sth->bind_param( 1, DateTime::Format::SQLite->format_date($expireBeforeDateTime), SQL_DATE );
     $sth->bind_param( 2, DateTime::Format::SQLite->format_date($expireAfterDateTime), SQL_DATE );
     $sth->execute();
@@ -3627,10 +3628,10 @@ sub DB_prune
     $sql = "delete from schedules_hash where not exists (select * from schedules as schedules where schedules.station = schedules_hash.station and schedules.day = schedules_hash.day)";
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
-       {
-         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
-         exit(1);
-       }
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+        exit(1);
+      }
     $sth->execute();
     if ($sth->err)
       {
@@ -3641,10 +3642,10 @@ sub DB_prune
     $sql = "delete from schedules where not exists (select * from schedules_hash as schedules_hash where schedules.station = schedules_hash.station and schedules.day = schedules_hash.day)";
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
-       {
-         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
-         exit(1);
-       }
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+        exit(1);
+      }
     $sth->execute();
     if ($sth->err)
       {
@@ -3655,10 +3656,10 @@ sub DB_prune
     $sql = "delete from stations_schedules_hash where station not in (select distinct channels.station from channels as channels)";
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
-       {
-         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
-         exit(1);
-       }
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+        exit(1);
+      }
     $sth->execute();
     if ($sth->err)
       {
@@ -3669,10 +3670,10 @@ sub DB_prune
     $sql = "delete from stations_schedules_hash where day < ? OR day > ?";
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
-       {
-         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
-         exit(1);
-       }
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+        exit(1);
+      }
     $sth->bind_param( 1, DateTime::Format::SQLite->format_date($expireBeforeDateTime), SQL_DATE );
     $sth->bind_param( 2, DateTime::Format::SQLite->format_date($expireAfterDateTime), SQL_DATE );
     $sth->execute();
@@ -3685,10 +3686,10 @@ sub DB_prune
     $sql = "delete from programs where program not in (select distinct schedules.program from schedules as schedules)";
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
-       {
-         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
-         exit(1);
-       }
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+        exit(1);
+      }
     $sth->execute();
     if ($sth->err)
       {
