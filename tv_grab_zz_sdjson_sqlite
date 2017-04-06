@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2017/04/xx - 1.29 - add supplemental SHow data to EPisodes
 # 2017/04/02 - 1.28 - misc. code cleanup
 # 2017/03/26 - 1.27 - misc. code cleanup
 # 2017/03/21 - 1.26 - fix sth typos
@@ -118,12 +119,12 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;            # RFC2838 compliant station ids, which makes XMLTV
                                                # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.28 2017/04/02 23:31:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.29 2017/04/06 18:10:00 gtb Exp ed $';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_zz_sdjson_sqlite';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
 
-my $SCRIPT_DB_VERSION          = 1;            # Used for script/db updates (see DB_open)
+my $SCRIPT_DB_VERSION          = 2;            # Used for script/db updates (see DB_open)
 
 my $SD_DESC                    = 'Schedules Direct';
 my $SD_SITEURL                 = 'https://www.schedulesdirect.org';
@@ -144,6 +145,7 @@ my $SD = SchedulesDirect->new();
 my $DBH;                                       # DataBase Handle
 
 my $nowDateTime = DateTime->now( time_zone => 'UTC' );
+my $nowDateTimeSQLite = DateTime::Format::SQLite->format_datetime($nowDateTime);
 
 my $quiet = 0;
 my $debug = 0;
@@ -493,7 +495,7 @@ else
         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
         exit(1);
       }
-    $sth->bind_param( 1, DateTime::Format::SQLite->format_datetime($nowDateTime), SQL_DATETIME );
+    $sth->bind_param( 1, $nowDateTimeSQLite, SQL_DATETIME );
     $sth->bind_param( 2, $conf->{'lineup'}->[0], SQL_VARCHAR );
     $sth->execute();
     if ($sth->err())
@@ -789,7 +791,7 @@ for (my $retry = 0; $retry < 7; $retry++)
 
     sleep(min(30, (10 * $retry)));
 
-    $sql1 = "replace into programs (program, hash, details) values (?, ?, ?)";
+    $sql1 = "replace into programs (program, hash, details, program_supplemental, downloaded) values (?, ?, ?, ?, ?)";
 
     $sth1 = $DBH->prepare_cached($sql1);
     if (!defined($sth1))
@@ -848,9 +850,17 @@ for (my $retry = 0; $retry < 7; $retry++)
                 next;
               }
             my $details = $JSON->utf8->encode($program);
+            my $supplemental;
+            if (substr($pID, 0, 2) eq 'EP')
+              {
+                $supplemental = 'SH' . substr($pID, 2, 8)  . '0000';
+              }
             $sth1->bind_param( 1, $pID, SQL_VARCHAR );
             $sth1->bind_param( 2, $hash, SQL_VARCHAR );
             $sth1->bind_param( 3, $details, SQL_VARCHAR );
+            $sth1->bind_param( 4, $supplemental, SQL_VARCHAR );
+            $sth1->bind_param( 5, $nowDateTimeSQLite, SQL_DATETIME );
+
             $sth1->execute();
             if ($sth1->err)
               {
@@ -858,7 +868,156 @@ for (my $retry = 0; $retry < 7; $retry++)
                 exit(1);
               }
           }
+        $DBH->commit();
+      }
 
+    # We are done unless one (or more) entities indicate that the server queued the request
+    last if (!$downloadQueued);
+  }
+
+#
+# Obtain the program supplemental information for programs
+# for which we do not have current information
+#
+for (my $retry = 0; $retry < 7; $retry++)
+  {
+
+    my $startDateTime = DateTime->now(time_zone => 'UTC')->add(days => $opt->{'offset'});
+    my $endDateTime = DateTime->now(time_zone => 'UTC')->add(days => $opt->{'offset'})->add(days => $opt->{'days'});
+
+    my $downloadQueued = 0;
+
+    # Select all necessary supplemental program entities, and
+    # randomly select others with an age bias (older more likely)
+    $sql = "select distinct p1.program_supplemental from programs as p1 " .
+           "  left join programs as supplemental on supplemental.program = p1.program_supplemental " .
+           "  where p1.program_supplemental is not null " .
+           "    and (   (supplemental.program is null) " .
+           "         or ((((julianday('now') - julianday(supplemental.downloaded)) / 30.0) + " .
+           "             (0.5 - random() / cast(-9223372036854775808 as real) / 2.0)) > 1.40 )) " .
+           "    and p1.program in ( select schedules.program from schedules as schedules " .
+           "      where (schedules.station in (select distinct stations.station from stations as stations " .
+           "        where stations.station in (select distinct channels.station from channels channels " .
+           "          where channels.lineup = ? and channels.selected = 1)) " .
+           "        and schedules.day >= ? and schedules.day < ? ) ) ";
+
+    $sth = $DBH->prepare_cached($sql);
+    if (!defined($sth))
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+        exit(1);
+      }
+
+    $sth->bind_param( 1, $conf->{'lineup'}->[0], SQL_VARCHAR );
+    $sth->bind_param( 2, DateTime::Format::SQLite->format_date($startDateTime), SQL_DATE );
+    $sth->bind_param( 3, DateTime::Format::SQLite->format_date($endDateTime), SQL_DATE );
+
+    $sth->execute();
+
+    if ($sth->err)
+      {
+        print (STDERR "Unexpected error when executing statement ($sql): " . $sth->errstr . "\n");
+        exit(1);
+      }
+
+    $sth->bind_col(1, undef, SQL_VARCHAR );
+
+    my $programsList = $sth->fetchall_arrayref([0]);
+
+    $sth->finish();
+
+    if (scalar(@{$programsList}) == 0)
+      {
+        if ($retry == 0)
+          {
+            print (STDERR "   not downloading programs for supplemental data (data current)\n") if (!$quiet);
+          }
+        last;
+      }
+
+    print (STDERR "   downloading " . scalar(@{$programsList}) . " new, updated, or missing programs for supplemental data" . (($retry == 0) ? "" : " (retry $retry)") . "\n") if (!$quiet);
+
+    sleep(min(30, (10 * $retry)));
+
+    $sql1 = "replace into programs (program, hash, details, program_supplemental, downloaded) values (?, ?, ?, ?, ?)";
+
+    $sth1 = $DBH->prepare_cached($sql1);
+    if (!defined($sth1))
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql1): " . $DBH->errstr . "\n");
+        exit(1);
+      }
+
+    my $programsIter;
+    $programsIter = natatime $SD_PROGRAM_CHUNK, @{$programsList};
+    while(my @chunk = $programsIter->())
+      {
+        print (STDERR "      downloading " . scalar(@chunk) . " new, updated, or missing programs for supplemental data in this chunk\n") if ((!$quiet) && ((scalar(@chunk) != scalar(@{$programsList}))));
+
+        my $pl = [];
+
+        foreach (@chunk)
+          {
+            push (@{$pl}, $_->[0]);
+          }
+
+        my $r = $SD->obtainPrograms(@{$pl});
+
+        if (!defined($r))
+          {
+            # For some reason, sometimes Schedules Direct returns malformed response (I believe due to
+            # their optimization for the program array returns, which can result in partial data).
+            # We will force a retry under those conditions.
+            print (STDERR "Unexpected error when obtaining programs: " . $SD->ErrorString() . " (will retry)\n") if (!$quiet);
+            $downloadQueued = 1;
+            next;
+            exit(1);
+          }
+
+        if (ref($r) ne 'ARRAY')
+          {
+            # For some reason, sometimes Schedules Direct return malformed response (I believe due to
+            # their optiomization for the program array returns, which can result in partial data).
+            # We will force a retry under those conditions.
+            print (STDERR "Unexpected return data type " . ref($r) . " when obtaining program array (will retry)\n") if (!$quiet);
+            $downloadQueued = 1;
+            next;
+            exit(1);
+          }
+
+        foreach my $program(@{$r})
+          {
+            my $pID = $program->{'programID'};
+            next if (!defined($pID));
+            my $hash = $program->{'md5'} || 0;
+            my $code = $program->{'code'} || 0;
+            if ($code != 0)
+              {
+                if ($code == 6001)
+                  {
+                    $downloadQueued = 1;
+                  }
+                next;
+              }
+            my $details = $JSON->utf8->encode($program);
+            my $supplemental;
+            if (substr($pID, 0, 2) eq 'EP')
+              {
+                $supplemental = 'SH' . substr($pID, 2, 8)  . '0000';
+              }
+            $sth1->bind_param( 1, $pID, SQL_VARCHAR );
+            $sth1->bind_param( 2, $hash, SQL_VARCHAR );
+            $sth1->bind_param( 3, $details, SQL_VARCHAR );
+            $sth1->bind_param( 4, $supplemental, SQL_VARCHAR );
+            $sth1->bind_param( 5, $nowDateTimeSQLite, SQL_DATETIME );
+
+            $sth1->execute();
+            if ($sth1->err)
+              {
+                print (STDERR "Unexpected error when executing statement ($sql1): " . $sth1->errstr . "\n");
+                exit(1);
+              }
+          }
         $DBH->commit();
       }
 
@@ -1039,7 +1198,7 @@ $w->startTag('tv',
   # desirable, but when you get back 40-50% of the cpu
   # it is a necessary compromise
   #
-  $sql = "select schedules.station, schedules.starttime, schedules.duration, schedules.program, schedules.details, programs.details, strftime('%Y%m%d%H%M%S', schedules.starttime), strftime('%Y%m%d%H%M%S', datetime(schedules.starttime, '+' || schedules.duration || ' seconds')), stations.details from schedules as schedules left join programs as programs on programs.program = schedules.program left join stations as stations on stations.station = schedules.station where schedules.station in (select distinct stations.station from stations as stations where stations.station in ( select distinct channels.station from channels as channels where channels.lineup = ? and channels.selected = 1)) AND schedules.day >= ? and schedules.day < ? order by schedules.station, schedules.starttime";
+  $sql = "select schedules.station, schedules.starttime, schedules.duration, schedules.program, schedules.details, programs.details, strftime('%Y%m%d%H%M%S', schedules.starttime), strftime('%Y%m%d%H%M%S', datetime(schedules.starttime, '+' || schedules.duration || ' seconds')), stations.details, supplemental.details from schedules as schedules left join programs as programs on programs.program = schedules.program left join stations as stations on stations.station = schedules.station left join programs as supplemental on programs.program_supplemental = supplemental.program where schedules.station in (select distinct stations.station from stations as stations where stations.station in ( select distinct channels.station from channels as channels where channels.lineup = ? and channels.selected = 1)) AND schedules.day >= ? and schedules.day < ? order by schedules.station, schedules.starttime";
 
   $sth = $DBH->prepare_cached($sql);
   if (!defined($sth))
@@ -1075,6 +1234,7 @@ $w->startTag('tv',
   $sth->bind_col( 7, undef, SQL_VARCHAR );
   $sth->bind_col( 8, undef, SQL_VARCHAR );
   $sth->bind_col( 9, undef, SQL_VARCHAR );
+  $sth->bind_col(10, undef, SQL_VARCHAR );
 
   my $programsWritten = 0;
 
@@ -1097,6 +1257,11 @@ $w->startTag('tv',
         {
           $stationDetails = $JSON->decode($r->[8]);
         }
+      my $supplementalDetails;
+      if (defined($r->[9]))
+        {
+          $supplementalDetails = $JSON->decode($r->[9]);
+        }
 
       $w->startTag('programme', 'channel' => generateRFC2838($sID),
                                 'start'   => "$r->[6] +0000",
@@ -1114,10 +1279,24 @@ $w->startTag('tv',
                   }
               }
           }
+        elsif (defined($supplementalDetails->{'titles'}))
+          {
+            foreach my $title(@{$supplementalDetails->{'titles'}})
+              {
+                if (defined($title->{'title120'}))
+                  {
+                    $w->dataElement('title', $title->{'title120'});
+                  }
+              }
+          }
 
         if (defined($programDetails->{'episodeTitle150'}))
           {
             $w->dataElement('sub-title', $programDetails->{'episodeTitle150'});
+          }
+        elsif (defined($supplementalDetails->{'episodeTitle150'}))
+          {
+            $w->dataElement('sub-title', $supplementalDetails->{'episodeTitle150'});
           }
 
         # Choose the "best" (i.e. longer) description if available
@@ -1141,79 +1320,92 @@ $w->startTag('tv',
                 $w->dataElement('desc', $desc, 'lang' => $lang);
               }
           }
+        elsif (defined($supplementalDetails->{'descriptions'}->{'description1000'}))
+          {
+            foreach my $d(@{$supplementalDetails->{'descriptions'}->{'description1000'}})
+              {
+                my $lang = $d->{'descriptionLanguage'};
+                my $desc = $d->{'description'};
+                next if ((!defined($lang) || (!defined($desc))));
+                $w->dataElement('desc', $desc, 'lang' => $lang);
+              }
+          }
+        elsif (defined($supplementalDetails->{'descriptions'}->{'description100'}))
+          {
+            foreach my $d(@{$supplementalDetails->{'descriptions'}->{'description100'}})
+              {
+                my $lang = $d->{'descriptionLanguage'};
+                my $desc = $d->{'description'};
+                next if ((!defined($lang) || (!defined($desc))));
+                $w->dataElement('desc', $desc, 'lang' => $lang);
+              }
+          }
 
         # XMLTV roles for this program
         my $roles =
           {
-            'director'                         => [],
-            'actor'                            => [],
-            'writer'                           => [],
-            'adapter'                          => [],
-            'producer'                         => [],
-            'composer'                         => [],
-            'editor'                           => [],
-            'presenter'                        => [],
-            'commentator'                      => [],
-            'guest'                            => []
+            'director'                         => {},
+            'actor'                            => {},
+            'writer'                           => {},
+            'adapter'                          => {},
+            'producer'                         => {},
+            'composer'                         => {},
+            'editor'                           => {},
+            'presenter'                        => {},
+            'commentator'                      => {},
+            'guest'                            => {}
           };
 
-        # XMLTV requires us to collect the various cast and
-        # crew items in order to process in the DTD order.
-        # We are taking a shortcut and not actually performing
-        # any additional billing order sort
+        # XMLTV dtd requires us to collect the various cast and
+        # crew items in order to process in the dtd order.  In
+        # addition, the dtd specifies that the order of the
+        # roles is meaningful (first billing should come first).
+        # All too often the supplemental (SHow) has more
+        # detailed cast/crew data that the program (EPisode)
+        # itself, and in particular, the character.
         if (defined($programDetails->{'cast'}))
           {
             foreach my $cast(@{$programDetails->{'cast'}})
               {
-                my $role = $castMap->{$cast->{'role'}};
-                my $characterName = $cast->{'characterName'};
-                if (defined($role))
-                  {
-                    if ($role eq 'actor')
-                      {
-                        push(@{$roles->{$role}}, {'name' => $cast->{'name'}, 'character' => $characterName});
-                      }
-                    else
-                      {
-                        push(@{$roles->{$role}}, $cast->{'name'});
-                      }
-                  }
+                addRole($roles, $castMap->{$cast->{'role'}}, $cast->{'name'}, $cast->{'billingOrder'}, $cast->{'characterName'});
               }
           }
         if (defined($programDetails->{'crew'}))
           {
             foreach my $crew(@{$programDetails->{'crew'}})
               {
-                my $role = $crewMap->{$crew->{'role'}};
-                if (defined($role))
-                  {
-                    push(@{$roles->{$role}}, $crew->{'name'});
-                  }
+                addRole($roles, $crewMap->{$crew->{'role'}}, $crew->{'name'}, $crew->{'billingOrder'}, undef);
               }
           }
-
+        if (defined($supplementalDetails->{'cast'}))
+          {
+            foreach my $cast(@{$supplementalDetails->{'cast'}})
+              {
+                addRole($roles, $castMap->{$cast->{'role'}}, $cast->{'name'}, '10' . $cast->{'billingOrder'}, $cast->{'characterName'});
+              }
+          }
+        if (defined($supplementalDetails->{'crew'}))
+          {
+            foreach my $crew(@{$supplementalDetails->{'crew'}})
+              {
+                addRole($roles, $crewMap->{$crew->{'role'}}, $crew->{'name'}, '10' . $crew->{'billingOrder'}, undef);
+              }
+          }
         $w->startTag('credits');
           foreach my $role('director', 'actor', 'writer', 'adapter', 'producer', 'composer', 'editor', 'presenter', 'commentator', 'guest')
             {
-              next if (0 == scalar(@{$roles->{$role}}));
-              foreach my $person(@{$roles->{$role}})
+              foreach my $person(sort {$roles->{$role}->{$a}->{'order'} <=> $roles->{$role}->{$b}->{'order'}} (keys %{$roles->{$role}}))
                 {
-                  if ($role eq 'actor')
+                  if (0 == scalar(@{$roles->{$role}->{$person}->{'character'}}))
                     {
-                      my $actor = $person->{'name'};
-                      my $character = $person->{'character'};
-                      if (defined($character))
-                        {
-                          $w->dataElement($role, $actor, 'role' => $character);
-                        }
-                      else
-                        {
-                          $w->dataElement($role, $actor);
-                        }
+                      $w->dataElement($role, $person);
                     }
                   else
                     {
-                      $w->dataElement($role, $person);
+                      foreach my $character(@{$roles->{$role}->{$person}->{'character'}})
+                        {
+                          $w->dataElement($role, $person, 'role' => $character);
+                        }
                     }
                 }
             }
@@ -1224,6 +1416,10 @@ $w->startTag('tv',
           {
             $w->dataElement('date', $programDetails->{'movie'}->{'year'});
           }
+        elsif (defined($supplementalDetails->{'movie'}->{'year'}))
+          {
+            $w->dataElement('date', $supplementalDetails->{'movie'}->{'year'});
+          }
 
         if (defined($conf->{'mythtv-categories'}->[0]) &&
             ($conf->{'mythtv-categories'}->[0] eq 'enabled'))
@@ -1231,7 +1427,9 @@ $w->startTag('tv',
             # For MythTV, we need to specify the first category
             # in the xmltv file as one of movie, series, sports,
             # or tvshow.  We can derive that from the entityType.
-            # If the station is a radio station, do not add tvshow
+            # If the station is a radio station, we do not add
+            # tvshow, but add radio (because the first category
+            # is not processed in the usual way).
             my $radioStation = 0;
             if (defined($stationDetails->{'isRadioStation'}))
               {
@@ -1254,7 +1452,11 @@ $w->startTag('tv',
                   }
                 else   # Should be Show
                   {
-                    if (!$radioStation)
+                    if ($radioStation)
+                      {
+                        $w->dataElement('category', 'radio');
+                      }
+                    else
                       {
                         $w->dataElement('category', 'tvshow');
                       }
@@ -1262,7 +1464,11 @@ $w->startTag('tv',
               }
             else   # entityType is supposed to be manditory, but....
               {
-                if (!$radioStation)
+                if ($radioStation)
+                  {
+                    $w->dataElement('category', 'radio');
+                  }
+                else
                   {
                     $w->dataElement('category', 'tvshow');
                   }
@@ -1270,48 +1476,87 @@ $w->startTag('tv',
           }
 
         # XMLTV categories are somewhat arbitrary.  We collect the
-        # genres, showType, and entityType as categories.
+        # genres, showType, and entityType as categories.  There is
+        # no order implication in the XMLTV dtd for categories,
+        # but at least one well known app cares about the order,
+        # so we try to be accomodating, and priorize program
+        # over supplemental data.
+        my $categories = {};
+        my $categorynum = 0;
         if (defined($programDetails->{'genres'}))
           {
             foreach my $genre(@{$programDetails->{'genres'}})
               {
-                $w->dataElement('category', $genre);
+                $categories->{$genre} = $categorynum++ if (!defined($categories->{$genre}));
               }
           }
-
+        if (defined($supplementalDetails->{'genres'}))
+          {
+            foreach my $genre(@{$supplementalDetails->{'genres'}})
+              {
+                $categories->{$genre} = $categorynum++ if (!defined($categories->{$genre}));
+              }
+          }
         if (defined($programDetails->{'showType'}))
           {
-            $w->dataElement('category', $programDetails->{'showType'});
+            $categories->{$programDetails->{'showType'}} = $categorynum++ if (!defined($categories->{$programDetails->{'showType'}}));
           }
-
+        if (defined($supplementalDetails->{'showType'}))
+          {
+            $categories->{$supplementalDetails->{'showType'}} = $categorynum++ if (!defined($categories->{$supplementalDetails->{'showType'}}));
+          }
         if (defined($programDetails->{'entityType'}))
           {
-            $w->dataElement('category', $programDetails->{'entityType'});
+            $categories->{$programDetails->{'entityType'}} = $categorynum++ if (!defined($categories->{$programDetails->{'entityType'}}));
+          }
+        if (defined($supplementalDetails->{'entityType'}))
+          {
+            $categories->{$supplementalDetails->{'entityType'}} = $categorynum++ if (!defined($categories->{$supplementalDetails->{'entityType'}}));
+          }
+        foreach my $category (sort {$categories->{$a} <=> $categories->{$b}} (keys %{$categories}))
+          {
+            $w->dataElement('category', $category);
           }
 
         # MythTV does not currently have a concept of keywords,
         # so this is output is likely meaningless.  Perhaps a
         # future enhancement (a new "programkeywords" table?),
         # or keywords should be added as categories?  Some of
-        # the keywords might make usable categories.
+        # the keywords might make usable categories.  There
+        # is no order implication for keywords in the XMLTV dtd.
+        my $keywords = {};
         if (defined($programDetails->{'keyWords'}))
           {
-            # XMLTV does not (currently) have a concept of
-            # categories of keywords (new extention keyword category="Mood",
-            # category="setting"?).  For now, we simple report them all
-            # as a keyword.
-            foreach my $keyCat(sort keys %{$programDetails->{'keyWords'}})
+            foreach my $keyCat(keys %{$programDetails->{'keyWords'}})
               {
                 foreach my $kw(@{$programDetails->{'keyWords'}->{$keyCat}})
                   {
-                    $w->dataElement('keyword', $kw);
+                    $keywords->{$kw} = 1
                   }
               }
+          }
+        if (defined($supplementalDetails->{'keyWords'}))
+          {
+            foreach my $keyCat(keys %{$supplementalDetails->{'keyWords'}})
+              {
+                foreach my $kw(@{$supplementalDetails->{'keyWords'}->{$keyCat}})
+                  {
+                    $keywords->{$kw} = 1
+                  }
+              }
+          }
+        foreach my $keyword (sort keys %{$keywords})
+          {
+            $w->dataElement('keyword', $keyword);
           }
 
         if (defined($programDetails->{'duration'}))
           {
             $w->dataElement('length', $programDetails->{'duration'}, 'units' => 'seconds');
+          }
+        elsif (defined($supplementalDetails->{'duration'}))
+          {
+            $w->dataElement('length', $supplementalDetails->{'duration'}, 'units' => 'seconds');
           }
 
         if (defined($programDetails->{'episodeImage'}) &&
@@ -1330,22 +1575,80 @@ $w->startTag('tv',
                 $w->emptyTag('icon', 'src' => $url);
               }
           }
+        elsif (defined($supplementalDetails->{'episodeImage'}) &&
+            defined($supplementalDetails->{'episodeImage'}->{'uri'}))
+          {
+            my $url = $SD->uriResolve($supplementalDetails->{'episodeImage'}->{'uri'}, '/image');
+            if (defined($supplementalDetails->{'episodeImage'}->{'width'}) &&
+                defined($supplementalDetails->{'episodeImage'}->{'height'}))
+              {
+                $w->emptyTag('icon', 'src' => $url,
+                                  'width' => $supplementalDetails->{'episodeImage'}->{'width'},
+                                  'height' => $supplementalDetails->{'episodeImage'}->{'height'});
+              }
+            else
+              {
+                $w->emptyTag('icon', 'src' => $url);
+              }
+          }
 
         if (defined($programDetails->{'officialURL'}))
           {
             $w->dataElement('url', $programDetails->{'officialURL'});
           }
+        elsif (defined($supplementalDetails->{'officialURL'}))
+          {
+            $w->dataElement('url', $supplementalDetails->{'officialURL'});
+          }
 
         my $prodid = $pID;
         if (length($prodid) == 14)
           {
-             $prodid = substr($prodid, 0, 10) . '.' . substr($prodid, 10, 4);
-             $w->dataElement('episode-num', $prodid, 'system' => 'dd_progid' );
+            $prodid = substr($prodid, 0, 10) . '.' . substr($prodid, 10, 4);
+            $w->dataElement('episode-num', $prodid, 'system' => 'dd_progid' );
           }
 
+        #if (defined($programDetails->{'resourceID'}))
+        #  {
+        #    $w->dataElement('episode-num', "resourceid/$programDetails->{'resourceID'}", 'system' => 'schedulesdirect.org');
+        #  }
+        #elsif (defined($supplementalDetails->{'resourceID'}))
+        #  {
+        #    $w->dataElement('episode-num', "resourceid/$supplementalDetails->{'resourceID'}", 'system' => 'schedulesdirect.org');
+        #  }
+
+        # Season/Episode numbering is "special" as SHows and
+        # EPisodes use slightly different interpretations of
+        # the exact same terms.
         my $season = '';
         my $episode = '';
         my $part = '';
+        my $programEpisode;
+        my $programTotalEpisodes;
+        my $programSeason;
+        my $showSeason;
+        my $showEpisode;
+        my $showTotalEpisodes;
+        my $showTotalSeasons;
+        my $showingPart;
+        my $showingTotalParts;
+        if (defined($supplementalDetails->{'metadata'}))
+          {
+            foreach my $meta(@{$supplementalDetails->{'metadata'}})
+              {
+                last if ((!defined($supplementalDetails->{'programID'})) ||
+                         ('SH' ne substr($supplementalDetails->{'programID'}, 0, 2)));
+                # We only support Gracenote season/episode metadata
+                if (defined($meta->{'Gracenote'}))
+                  {
+                    $showSeason = $meta->{'Gracenote'}->{'season'};
+                    $showEpisode = $meta->{'Gracenote'}->{'episode'};
+                    $showTotalSeasons = $meta->{'Gracenote'}->{'totalSeasons'};
+                    $showTotalEpisodes = $meta->{'Gracenote'}->{'totalEpisodes'};
+                    last;
+                  }
+              }
+          }
         if (defined($programDetails->{'metadata'}))
           {
             foreach my $meta(@{$programDetails->{'metadata'}})
@@ -1353,35 +1656,32 @@ $w->startTag('tv',
                 # We only support Gracenote season/episode metadata
                 if (defined($meta->{'Gracenote'}))
                   {
-                    $season = $meta->{'Gracenote'}->{'season'};
-                    my $totalSeasons = $meta->{'Gracenote'}->{'totalSeasons'};
-                    $episode = $meta->{'Gracenote'}->{'episode'};
-                    my $totalEpisodes = $meta->{'Gracenote'}->{'totalEpisodes'};
-                    next if (!defined($season));
-                    $season = '0' if (!looks_like_number($season));
-                    $totalSeasons = '' if (!looks_like_number($totalSeasons));
-                    $episode = '0' if (!looks_like_number($episode));
-                    $totalEpisodes = '' if (!looks_like_number($totalEpisodes));
-                    $season = $season - 1;
-                    $season = '' if ($season < 0);
-                    $season = "$season / $totalSeasons" if ($totalSeasons ne '');
-                    $episode = $episode - 1;
-                    $episode = '' if ($episode < 0);
-                    $episode = "$episode / $totalEpisodes" if ($totalEpisodes ne '');
+                    if (substr($pID, 0, 2) eq 'SH')
+                      {
+                        $showSeason = $meta->{'Gracenote'}->{'season'};
+                        $showEpisode = $meta->{'Gracenote'}->{'episode'};
+                        $showTotalSeasons = $meta->{'Gracenote'}->{'totalSeasons'};
+                        $showTotalEpisodes = $meta->{'Gracenote'}->{'totalEpisodes'};
+                      }
+                    else
+                      {
+                        $programSeason = $meta->{'Gracenote'}->{'season'};
+                        $programEpisode = $meta->{'Gracenote'}->{'episode'};
+                        $programTotalEpisodes = $meta->{'Gracenote'}->{'totalEpisodes'};
+                      }
                     last;
                   }
               }
           }
         if (defined($scheduleDetails->{'multipart'}))
           {
-            $part = $scheduleDetails->{'multipart'}->{'partNumber'};
-            my $totalParts = $scheduleDetails->{'multipart'}->{'totalParts'};
-            $part = 0 if (!looks_like_number($part));
-            $part = $part - 1;
-            $part = '' if ($part < 0);
-            $totalParts = '' if (!looks_like_number($totalParts));
-            $part = "$part / $totalParts" if ($totalParts ne '');
+            $showingPart = $scheduleDetails->{'multipart'}->{'partNumber'};
+            $showingTotalParts = $scheduleDetails->{'multipart'}->{'totalParts'};
           }
+        $programSeason = $showSeason if (!defined($programSeason));
+        $season = generateXMLTV_NS($programSeason, $showTotalSeasons);
+        $episode = generateXMLTV_NS($programEpisode, $programTotalEpisodes);
+        $part = generateXMLTV_NS($showingPart, $showingTotalParts);
         if (($season ne '') || ($episode ne '') || ($part ne ''))
           {
             $w->dataElement('episode-num', " $season . $episode . $part ", 'system' => 'xmltv_ns');
@@ -1443,6 +1743,12 @@ $w->startTag('tv',
             my $start = substr($originalAirDate, 0, 4) . substr($originalAirDate, 5, 2) . substr($originalAirDate, 8, 2) . " +0000";
             $w->emptyTag('previously-shown', start => $start);
           }
+        elsif (defined($supplementalDetails->{'originalAirDate'}))
+          {
+            my $originalAirDate = $supplementalDetails->{'originalAirDate'};
+            my $start = substr($originalAirDate, 0, 4) . substr($originalAirDate, 5, 2) . substr($originalAirDate, 8, 2) . " +0000";
+            $w->emptyTag('previously-shown', start => $start);
+          }
         else
           {
             my $new = 0;
@@ -1452,7 +1758,7 @@ $w->startTag('tv',
 
         # XMLTV premiere/last-chance is sort of arbitrarily
         # defined, so we decide on our own mapping (while
-        # season finale may mot be a last-chance, since
+        # season finale may not be a last-chance, since
         # in the US every season finale may be a series
         # finale (no renewal before its time) we just treat
         # it as the last-chance).
@@ -1478,13 +1784,27 @@ $w->startTag('tv',
         $w->emptyTag('subtitles', 'type' => 'teletext') if ($audioHasCC);
 
         # Schedules Direct data can have duplicate ratings for
-        # a body (one in the schedule, one in the program), so we
-        # store only the last, if multiple exist.
-        # We remap the rating agency to the MythTV standard,
-        # as it is as good of a standard as anything else,
-        # and makes importing the data much easier.
+        # a body (one in the schedule, one in the program, and
+        # one for the show/series), so we store only the last,
+        # if multiple exist.  We remap the rating agency to the
+        # MythTV standard, as it is as good of a standard as
+        # anything else, and makes importing the data much easier.
         my $ratings = {};
-        # Programs can have an original rating.
+        # Supplemental can have generic show ratings
+        if (defined($supplementalDetails->{'contentRating'}))
+          {
+            foreach my $rating(@{$supplementalDetails->{'contentRating'}})
+              {
+                my $body = $rating->{'body'};
+                my $code = $rating->{'code'};
+                ($body, $code) = mapRatingAgency($body, $code);
+                if (defined($body) && defined($code))
+                  {
+                    $ratings->{$body} = $code;
+                  }
+              }
+          }
+        # Programs can have rating for this specific program
         if (defined($programDetails->{'contentRating'}))
           {
             foreach my $rating(@{$programDetails->{'contentRating'}})
@@ -1523,19 +1843,56 @@ $w->startTag('tv',
             $w->endTag('rating');
           }
 
-        # XMLTV advisories are arbitrary values
+        # XMLTV advisories are arbitrary values.  Collect from program and supplemental
+        my $advisories = {};
+        if (defined($supplementalDetails->{'contentAdvisory'}))
+          {
+            foreach my $advisory(@{$supplementalDetails->{'contentAdvisory'}})
+              {
+                $advisories->{$advisory} = 1;
+              }
+          }
         if (defined($programDetails->{'contentAdvisory'}))
           {
             foreach my $advisory(@{$programDetails->{'contentAdvisory'}})
               {
-                $w->startTag('rating', 'system' => 'advisory');
-                  $w->dataElement('value', $advisory);
-                $w->endTag('rating')
+                $advisories->{$advisory} = 1;
               }
+          }
+        foreach my $advisory(sort keys %{$advisories})
+          {
+            $w->startTag('rating', 'system' => 'advisory');
+              $w->dataElement('value', $advisory);
+            $w->endTag('rating')
           }
 
         # XMLTV star-rating starts from zero (so if rating agency is 1-4,
         # we adjust the reported values to be from 0-3.
+        my $starRatings = {};
+        if (defined($supplementalDetails->{'movie'}->{'qualityRating'}))
+          {
+            foreach my $quality(@{$supplementalDetails->{'movie'}->{'qualityRating'}})
+              {
+                my $body = $quality->{'ratingsBody'};
+                my $min = $quality->{'minRating'};
+                my $max = $quality->{'maxRating'};
+                my $incr = $quality->{'increment'};
+                my $rating = $quality->{'rating'};
+                if (defined($body) && defined($min) && defined($max) && defined($incr) && defined($rating) &&
+                    looks_like_number($min) && looks_like_number($max) && looks_like_number($incr) && looks_like_number($rating))
+                  {
+                    $min = 0 + $min;
+                    $max = 0 + $max;
+                    $incr = 0 + $incr;
+                    $rating = 0 + $rating;
+                    $rating = $min if ($rating < $min);
+                    $rating = $max if ($rating > $max);
+                    my $adjustedRating = ($rating - $min);
+                    my $adjustedMax = ($max - $min);
+                    $starRatings->{$body} = "$adjustedRating/$adjustedMax";
+                  }
+              }
+          }
         if (defined($programDetails->{'movie'}->{'qualityRating'}))
           {
             foreach my $quality(@{$programDetails->{'movie'}->{'qualityRating'}})
@@ -1556,11 +1913,15 @@ $w->startTag('tv',
                     $rating = $max if ($rating > $max);
                     my $adjustedRating = ($rating - $min);
                     my $adjustedMax = ($max - $min);
-                    $w->startTag('star-rating', 'system' => $body);
-                      $w->dataElement('value', "$adjustedRating/$adjustedMax");
-                    $w->endTag('star-rating');
+                    $starRatings->{$body} = "$adjustedRating/$adjustedMax";
                   }
               }
+          }
+        foreach my $body(sort keys %{$starRatings})
+          {
+            $w->startTag('star-rating', 'system' => $body);
+              $w->dataElement('value', $starRatings->{$body});
+            $w->endTag('star-rating');
           }
 
       $w->endTag('programme');
@@ -1951,19 +2312,22 @@ sub channelWriter
           $writer->dataElement('display-name', $callsign, 'lang' => 'en') if ($callsign ne '');
           $writer->dataElement('display-name', $channum, 'lang' => 'en') if ($channum ne '');
 
-          if (defined($s->{'logo'}->{'URL'}))
+          # Should probably return all stationLogo's, but some applications are
+          # known to take the last and not the first, so return only the first
+          if (defined($s->{'stationLogo'}->[0]->{'URL'}))
             {
-              if (defined($s->{'logo'}->{'width'}) && defined($s->{'logo'}->{'height'}))
+              if (defined($s->{'stationLogo'}->[0]->{'width'}) && defined($s->{'stationLogo'}->[0]->{'height'}))
                 {
-                  $writer->emptyTag('icon', 'src' => $s->{'logo'}->{'URL'},
-                                    'width' => $s->{'logo'}->{'width'},
-                                    'height' => $s->{'logo'}->{'height'});
+                  $writer->emptyTag('icon', 'src' => $s->{'stationLogo'}->[0]->{'URL'},
+                                    'width' => $s->{'stationLogo'}->[0]->{'width'},
+                                    'height' => $s->{'stationLogo'}->[0]->{'height'});
                 }
               else
                 {
-                  $writer->emptyTag('icon', 'src' => $s->{'logo'}->{'URL'});
+                  $writer->emptyTag('icon', 'src' => $s->{'stationLogo'}->[0]->{'URL'});
                 }
             }
+
         $writer->endTag('channel');
 
         $channelsWritten++;
@@ -2278,18 +2642,21 @@ sub getLineup
                         }
                     }
 
-                  if (defined($s->{'logo'}->{'URL'}))
+                  # get-lineup proposal is not precise, but it appears we
+                  # should only return one logo, so return only the first
+                  if (defined($s->{'stationLogo'}->[0]->{'URL'}))
                     {
-                      if (defined($s->{'logo'}->{'width'}) && defined($s->{'logo'}->{'height'}))
+                      if (defined($s->{'stationLogo'}->[0]->{'width'}) && defined($s->{'stationLogo'}->[0]->{'height'}))
                         {
-                          $w->emptyTag('logo', 'url' => $s->{'logo'}->{'URL'},
-                                               'height' => $s->{'logo'}->{'height'},
-                                               'width' => $s->{'logo'}->{'width'});
+                          $w->emptyTag('logo', 'url' => $s->{'stationLogo'}->[0]->{'URL'},
+                                               'height' => $s->{'stationLogo'}->[0]->{'height'},
+                                               'width' => $s->{'stationLogo'}->[0]->{'width'});
                         }
                       else
                         {
-                          $w->emptyTag('logo', 'url' => $s->{'logo'}->{'URL'});
+                          $w->emptyTag('logo', 'url' => $s->{'stationLogo'}->[0]->{'URL'});
                         }
+
                     }
 
                   $w->endTag('station');
@@ -2975,7 +3342,7 @@ sub SD_downloadLineupMaps
         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
         exit(1);
       }
-    $sth->bind_param( 1, DateTime::Format::SQLite->format_datetime($nowDateTime), SQL_DATETIME );
+    $sth->bind_param( 1, $nowDateTimeSQLite, SQL_DATETIME );
     $sth->bind_param( 2, $lineup, SQL_VARCHAR );
 
     $sth->execute();
@@ -3373,14 +3740,74 @@ sub DB_open
       }
     elsif ($version < $SCRIPT_DB_VERSION)
       {
-        ##  if (1 == $version)  ## Example upgrade (version 1 to 2)
-        ##    {
-        ##      $version = 2;
-        ##      print (STDERR "Upgrading database to version $version\n") if (!$quiet);
-        ##      ## Alter table, create index, ?
-        ##      DB_settingsSet('version', $version);
-        ##      $DBH->commit();
-        ##    }
+        if (1 == $version)
+          {
+            $version = 2;
+            print (STDERR "Upgrading database to version $version\n") if (!$quiet);
+            $rc = $DBH->do("alter table programs add column program_supplemental varchar(128)");
+            if ((!defined($rc)) || ($rc < 0))
+              {
+                print (STDERR "Unable to add column program_supplemental to programs table in database $dbname: " . $DBH->errstr . "\n");
+                $DBH->rollback();
+                exit(1);
+              }
+            $rc = $DBH->do("alter table programs add column downloaded datetime not null default '1970-01-01 00:00:00'");
+            if ((!defined($rc)) || ($rc < 0))
+              {
+                print (STDERR "Unable to add column downloaded to programs table in database $dbname: " . $DBH->errstr . "\n");
+                $DBH->rollback();
+                exit(1);
+              }
+            $rc = $DBH->do("create index programs_index_program_supplemental on programs(program_supplemental)");
+            if ((!defined($rc)) || ($rc < 0))
+              {
+                print (STDERR "Unable to create programs_index_program_supplemental in database $dbname: " . $DBH->errstr . "\n");
+                $DBH->rollback();
+                exit(1);
+              }
+            $rc = $DBH->do("create index programs_index_downloaded on programs(downloaded)");
+            if ((!defined($rc)) || ($rc < 0))
+              {
+                print (STDERR "Unable to create programs_index_downloaded in database $dbname: " . $DBH->errstr . "\n");
+                $DBH->rollback();
+                exit(1);
+              }
+            # Update existing programs
+            $sql = "update programs set downloaded = ?";
+            $sth = $DBH->prepare_cached($sql);
+            if (!defined($sth))
+              {
+                print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+                $DBH->rollback();
+                exit(1);
+              }
+            $sth->bind_param( 1, $nowDateTimeSQLite, SQL_DATETIME );
+            $sth->execute();
+            if ($sth->err)
+              {
+                print (STDERR "Unexpected error when executing statement ($sql): " . $sth->errstr . "\n");
+                $DBH->rollback();
+                exit(1);
+              }
+            $sql = "update programs set program_supplemental = 'SH' || substr(program,3,8) || '0000' where program like 'EP%'";
+            $sth = $DBH->prepare_cached($sql);
+            if (!defined($sth))
+              {
+                print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+                $DBH->rollback();
+                exit(1);
+              }
+            $sth->execute();
+            if ($sth->err)
+              {
+                print (STDERR "Unexpected error when executing statement ($sql): " . $sth->errstr . "\n");
+                $DBH->rollback();
+                exit(1);
+              }
+            DB_settingsSet('version', $version);
+            $DBH->commit();
+          }
+
         ##
         ##  if (2 == $version   ## Example upgrade (version 2 to 3)
         ##    {
@@ -3514,7 +3941,7 @@ sub DB_prune
         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
         exit(1);
       }
-    $sth->bind_param( 1, DateTime::Format::SQLite->format_datetime($nowDateTime), SQL_DATETIME );
+    $sth->bind_param( 1, $nowDateTimeSQLite, SQL_DATETIME );
     $sth->execute();
     if ($sth->err)
       {
@@ -3529,7 +3956,7 @@ sub DB_prune
         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
         exit(1);
       }
-    $sth->bind_param( 1, DateTime::Format::SQLite->format_datetime($nowDateTime), SQL_DATETIME );
+    $sth->bind_param( 1, $nowDateTimeSQLite, SQL_DATETIME );
     $sth->execute();
     if ($sth->err)
       {
@@ -3682,8 +4109,8 @@ sub DB_prune
         print (STDERR "Unable to prune stations_schedules_hash for past and far future dates in database: " . $sth->errstr . "\n");
       }
 
-    # Delete programs no longer referenced by a schedule
-    $sql = "delete from programs where program not in (select distinct schedules.program from schedules as schedules)";
+    # Delete programs no longer referenced by a schedule and are not supplemental
+    $sql = "delete from programs where program not in (select distinct schedules.program from schedules as schedules) and program not in (select distinct p2.program_supplemental from programs as p2 where p2.program_supplemental is not null)";
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
       {
@@ -3694,6 +4121,22 @@ sub DB_prune
     if ($sth->err)
       {
         print (STDERR "Unable to prune programs no longer referenced in database: " . $sth->errstr . "\n");
+      }
+
+    # Update programs which have a downloaded data in the future (bad rtc?)
+    # (this should force a refresh of any supplemental programs downloaded with bad dates)
+    $sql = "update programs set downloaded = '1970-01-01 00:00:00' where downloaded > ?";
+    $sth = $DBH->prepare_cached($sql);
+    if (!defined($sth))
+       {
+         print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+         exit(1);
+       }
+    $sth->bind_param( 1, $nowDateTimeSQLite, SQL_DATETIME );
+    $sth->execute();
+    if ($sth->err)
+      {
+        print (STDERR "Unable to update programs with downloaded dates in the future in database: " . $sth->errstr . "\n");
       }
 
     $DBH->commit();
@@ -4388,6 +4831,97 @@ sub generateRFC2838
       {
         return ($station);
       }
+  }
+
+#
+# generateXMLTV_NS
+#
+# Per the XMLTV definition, the xmltv_ns string has
+# two parts, the number (zero origin) and the total
+# separated by a '/' if the total exists. This routine
+# provides the formatting conversion.
+#
+#   Input:
+#              number      - the base number
+#              total       - the total
+#   Output:
+#              xmltv_ns    - the string representing the number/total
+#
+sub generateXMLTV_NS
+  {
+    my ($number, $total, undef) = @_;
+    return '' if (!defined($number));
+    if ($number =~ /^\d+$/)
+      {
+        $number = $number - 1;
+        if ($number >= 0)
+          {
+            return "$number" if (!defined($total));
+            if ($total =~ /^\d+$/)
+              {
+                $total = $total + 0;
+                if ($total > 0)
+                  {
+                    return "$number / $total";
+                  }
+              }
+            return "$number";
+          }
+      }
+    return '';
+  }
+
+#
+# addRole
+#
+# Add a role to the roles hash, eliminating duplicates
+# and treating an empty character as incomplete if
+# other (better?) character entries are provided later.
+# Note that (unfortunately), we have no way of knowing
+# which "character" is better if we get more than one
+# (and the same actor could be playing multiple roles),
+# so we just return them all.
+#
+#   Input:
+#              roles       - existing $roles array
+#              role        - role to add
+#              person      - person to add to role
+#              order       - billing order
+#              character   - character being played
+#   Output:
+#              none        - $roles array updated
+#
+sub addRole
+  {
+    my ($roles, $role, $person, $order, $character, undef) = @_;
+    return if (!defined($role));
+    return if (!defined($person));
+    return if (!defined($order));
+    return if ($order !~ /^\d+$/);
+    my $ra = $roles->{$role};
+    return if (!defined($ra));
+    $character = '' if (!defined($character));
+    if ($character eq '')
+      {
+        if (!defined($ra->{$person}))          # Only add person if we do not have them
+          {
+            $ra->{$person}->{'order'} = 0 + $order;
+            $ra->{$person}->{'character'} = [];
+          }
+      }
+    else
+      {
+        if (!defined($ra->{$person}))          # Only add person order if we do not have them
+          {
+            $ra->{$person}->{'order'} = 0 + $order;
+          }
+        foreach my $c(@{$ra->{$person}->{'character'}})    # Do not duplicate characters
+          {
+            return if ($c eq $character);
+          }
+        push(@{$ra->{$person}->{'character'}}, $character);
+      }
+    return;
   }
 
 #
