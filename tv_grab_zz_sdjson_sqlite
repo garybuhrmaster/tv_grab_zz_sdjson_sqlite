@@ -44,7 +44,8 @@
 #
 # Version history:
 #
-# 2017/04/xx - 1.29 - add supplemental SHow data to EPisodes
+# 2017/04/18 - 1.30 - fix typo (in version history)
+# 2017/04/06 - 1.29 - add supplemental SHow data to EPisodes
 # 2017/04/02 - 1.28 - misc. code cleanup
 # 2017/03/26 - 1.27 - misc. code cleanup
 # 2017/03/21 - 1.26 - fix sth typos
@@ -119,7 +120,7 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;            # RFC2838 compliant station ids, which makes XMLTV
                                                # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.29 2017/04/06 18:10:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.30 2017/04/18 14:56:00 gtb Exp ed $';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_zz_sdjson_sqlite';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
