@@ -16,7 +16,7 @@ supported for at least a year after the application has been identified as
 being non-complaint with the XMLTV definition or that the application does
 not provide the desired functionality, if code changes or refactor in this
 grabber impact the ability to support a fixup, the fixup may be removed
-even before that targete.
+sooner.
 
 NOTE: Requests to add fixups should include a patch or pull request.
 
