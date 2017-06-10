@@ -1460,13 +1460,41 @@ $w->startTag('tv',
                   }
                 else   # Should be Show
                   {
-                    if ($radioStation)
+                    my $showType = '';
+                    if (defined($programDetails->{'showType'}))
                       {
-                        $w->dataElement('category', 'radio');
+                        $showType = $programDetails->{'showType'};
+                      }
+                    elsif (defined($supplementalDetails->{'showType'}))
+                      {
+                        $showType = $supplementalDetails->{'showType'};
+                      }
+                    if (($showType eq 'Feature Film') ||
+                        ($showType eq 'Short Film') ||
+                        ($showType eq 'TV Movie'))
+                      {
+                        $w->dataElement('category', 'movie');
+                      }
+                    elsif (($showType eq 'Sports event') ||
+                           ($showType eq 'Sports non-event'))
+                      {
+                        $w->dataElement('category', 'sports');
+                      }
+                    elsif (($showType eq 'Series') ||
+                           ($showType eq 'Miniseries'))
+                      {
+                        $w->dataElement('category', 'series');
                       }
                     else
                       {
-                        $w->dataElement('category', 'tvshow');
+                        if ($radioStation)
+                          {
+                            $w->dataElement('category', 'radio');
+                          }
+                        else
+                          {
+                            $w->dataElement('category', 'tvshow');
+                          }
                       }
                   }
               }
