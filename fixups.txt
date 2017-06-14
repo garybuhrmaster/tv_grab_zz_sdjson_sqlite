@@ -35,8 +35,8 @@ Currently implemented fixups:
         episode numbering.
 
         Known apps: MythTV master before 585f509 (fixes/0.28 before e26a33c)
-       
-    NO_PREVIOUSLY_SHOWN_ZONE_OFFSET 
+
+    NO_PREVIOUSLY_SHOWN_ZONE_OFFSET
 
         Do not add in the zulu offset for previously shown.
 
