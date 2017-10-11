@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2017/10/11 - 1.34 - download artwork.
 # 2017/07/21 - 1.33 - dtd compliance.  Only actors can have roles
 # 2017/06/19 - 1.32 - derive category from showtype
 # 2017/04/20 - 1.31 - provide fixup support
@@ -123,12 +124,12 @@ use Data::Dumper;
 my $RFC2838_COMPLIANT          = 1;            # RFC2838 compliant station ids, which makes XMLTV
                                                # validate even though the docs say "SHOULD" not "MUST"
 
-my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.33 2017/07/21 01:19:00 gtb Exp ed $';
+my $SCRIPT_VERSION             = '$Id: tv_grab_zz_sdjson_sqlite,v 1.34 2017/10/11 01:19:00 gtb Exp ed $';
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_zz_sdjson_sqlite';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
 
-my $SCRIPT_DB_VERSION          = 2;            # Used for script/db updates (see DB_open)
+my $SCRIPT_DB_VERSION          = 3;            # Used for script/db updates (see DB_open)
 
 my $SD_DESC                    = 'Schedules Direct';
 my $SD_SITEURL                 = 'https://www.schedulesdirect.org';
@@ -141,6 +142,7 @@ my $SD_COMMENT                 = 'Note: This data has been downloaded from Sched
 my $SD_SCHEDULE_HASH_CHUNK     = 250;          # Request stations schedules hash in chunk sizes
 my $SD_SCHEDULE_CHUNK          = 1000;         # Request stations schedules in chunk sizes
 my $SD_PROGRAM_CHUNK           = 4000;         # Request program data in chunk sizes
+my $SD_ARTWORK_CHUNK           = 500;          # Request artwork data in chunk sizes
 
 my $JSON                       = JSON->new()->shrink(1)->utf8(1);
 
@@ -730,12 +732,13 @@ for (my $retry = 0; $retry < 7; $retry++)
     last if (!$downloadQueued);
   }
 
+my %artworkProgram;
+
 #
 # Obtain the program information for programs for which
 # we do not have current information based on hash values
 # and feed to our DB
 #
-
 for (my $retry = 0; $retry < 7; $retry++)
   {
 
@@ -877,6 +880,7 @@ for (my $retry = 0; $retry < 7; $retry++)
                 print (STDERR "Unexpected error when executing statement ($sql1): " . $sth1->errstr . "\n");
                 exit(1);
               }
+            $artworkProgram{$pID} = 1 if ($program->{'hasImageArtwork'});
           }
         $DBH->commit();
       }
@@ -1027,6 +1031,8 @@ for (my $retry = 0; $retry < 7; $retry++)
                 print (STDERR "Unexpected error when executing statement ($sql1): " . $sth1->errstr . "\n");
                 exit(1);
               }
+
+            $artworkProgram{$pID} = 1 if ($program->{'hasImageArtwork'});
           }
         $DBH->commit();
       }
@@ -1034,6 +1040,108 @@ for (my $retry = 0; $retry < 7; $retry++)
     # We are done unless one (or more) entities indicate that the server queued the request
     last if (!$downloadQueued);
   }
+
+
+$sql4 = "replace into artwork (program, hash, details) values (?, ?, ?)";
+$sth4 = $DBH->prepare_cached($sql4);
+if (!defined($sth4))
+  {
+      print (STDERR "Unexpected error when preparing statement ($sql4): " . $DBH->errstr . "\n");
+      exit(1);
+  }
+
+for (my $retry = 0; $retry < 7; $retry++)
+  {
+    my $downloadQueued = 0;
+    my $numArtwork = scalar keys %artworkProgram;
+
+    if ($numArtwork == 0)
+      {
+        if ($retry == 0)
+          {
+            print (STDERR "   not downloading artwork (data current)\n") if (!$quiet);
+          }
+        last;
+      }
+
+    print (STDERR "   downloading " . $numArtwork . " new, updated, or missing artwork" . (($retry == 0) ? "" : " (retry $retry)") . "\n") if (!$quiet);
+
+    sleep(min(30, (10 * $retry)));
+
+    my $artworkIter = natatime $SD_ARTWORK_CHUNK, keys %artworkProgram;
+
+    while(my @chunk = $artworkIter->())
+      {
+          print (STDERR "      downloading " . scalar(@chunk) . " new, updated, or missing artwork for programs in this chunk of total $numArtwork artwork\n") if ((!$quiet) && ((scalar(@chunk) != $numArtwork)));
+
+        my $pl = [];
+
+        foreach (@chunk)
+          {
+            push (@{$pl}, $_);
+          }
+          my $r = $SD->obtainProgramsArtwork(@{$pl});
+          if (!defined($r))
+            {
+                print (STDERR "Unexpected error when obtaining artwork: " . $SD->ErrorString() . " (will retry)\n") if (!$quiet);
+                $downloadQueued = 1;
+                next;
+                exit(1);
+            }
+
+        if (ref($r) ne 'ARRAY')
+          {
+            # For some reason, sometimes Schedules Direct return malformed response (I believe due to
+            # their optiomization for the program array returns, which can result in partial data).
+            # We will force a retry under those conditions.
+            print (STDERR "Unexpected return data type " . ref($r) . " when obtaining artwork array (will retry)\n") if (!$quiet);
+            $downloadQueued = 1;
+            next;
+            exit(1);
+          }
+        foreach my $artwork(@{$r})
+          {
+            my $pID = $artwork->{'programID'};
+            next if (!defined($pID));
+            # Artwork currently has no hash, but we persist one for consistency.
+            # In the future perhaps we persist the hash from the program.
+            my $hash = $artwork->{'md5'} || 0;
+            my $code = $artwork->{'code'} || 0;
+            if ($code != 0)
+              {
+                if ($code == 5001)
+                  {
+                      # We currently ignore the queued response since,
+                      # unlike programs, a queued image is never
+                      # generated immediately and could take a few
+                      # days. In this case, you are left with no
+                      # artwork unless the program itself changes its
+                      # hash and is re-downloaded. But for series we
+                      # would use the SHow artwork instead.
+                      #
+                      # $downloadQueued = 1;
+                  }
+                next;
+              }
+            my $details = $JSON->utf8->encode($artwork);
+            $sth4->bind_param( 1, $pID, SQL_VARCHAR );
+            $sth4->bind_param( 2, $hash, SQL_VARCHAR );
+            $sth4->bind_param( 3, $details, SQL_VARCHAR );
+
+            $sth4->execute();
+            if ($sth4->err)
+              {
+                print (STDERR "Unexpected error when executing statement ($sql1): " . $sth4->errstr . "\n");
+                exit(1);
+              }
+
+          }
+        $DBH->commit();
+      }
+    # We are done unless one (or more) entities indicate that the server queued the request
+    last if (!$downloadQueued);
+  }
+
 
 #
 # Process data and report
@@ -1208,7 +1316,7 @@ $w->startTag('tv',
   # desirable, but when you get back 40-50% of the cpu
   # it is a necessary compromise
   #
-  $sql = "select schedules.station, schedules.starttime, schedules.duration, schedules.program, schedules.details, programs.details, strftime('%Y%m%d%H%M%S', schedules.starttime), strftime('%Y%m%d%H%M%S', datetime(schedules.starttime, '+' || schedules.duration || ' seconds')), stations.details, supplemental.details from schedules as schedules left join programs as programs on programs.program = schedules.program left join stations as stations on stations.station = schedules.station left join programs as supplemental on programs.program_supplemental = supplemental.program where schedules.station in (select distinct stations.station from stations as stations where stations.station in ( select distinct channels.station from channels as channels where channels.lineup = ? and channels.selected = 1)) AND schedules.day >= ? and schedules.day < ? order by schedules.station, schedules.starttime";
+  $sql = "select schedules.station, schedules.starttime, schedules.duration, schedules.program, schedules.details, programs.details, strftime('%Y%m%d%H%M%S', schedules.starttime), strftime('%Y%m%d%H%M%S', datetime(schedules.starttime, '+' || schedules.duration || ' seconds')), stations.details, supplemental.details, artwork.details, supart.details from schedules as schedules left join programs as programs on programs.program = schedules.program left join stations as stations on stations.station = schedules.station left join programs as supplemental on programs.program_supplemental = supplemental.program left join artwork as artwork on programs.program = artwork.program left join artwork as supart on programs.program_supplemental = supart.program where schedules.station in (select distinct stations.station from stations as stations where stations.station in ( select distinct channels.station from channels as channels where channels.lineup = ? and channels.selected = 1)) AND schedules.day >= ? and schedules.day < ? order by schedules.station, schedules.starttime";
 
   $sth = $DBH->prepare_cached($sql);
   if (!defined($sth))
@@ -1245,6 +1353,8 @@ $w->startTag('tv',
   $sth->bind_col( 8, undef, SQL_VARCHAR );
   $sth->bind_col( 9, undef, SQL_VARCHAR );
   $sth->bind_col(10, undef, SQL_VARCHAR );
+  $sth->bind_col(11, undef, SQL_VARCHAR );
+  $sth->bind_col(12, undef, SQL_VARCHAR );
 
   my $programsWritten = 0;
 
@@ -1272,7 +1382,16 @@ $w->startTag('tv',
         {
           $supplementalDetails = $JSON->decode($r->[9]);
         }
-
+      my $artwork;
+      if (defined($r->[10]))
+        {
+          $artwork = $JSON->decode($r->[10]);
+        }
+      my $supArt;
+      if (defined($r->[11]))
+        {
+          $supArt = $JSON->decode($r->[11]);
+        }
       $w->startTag('programme', 'channel' => generateRFC2838($sID),
                                 'start'   => "$r->[6] +0000",
                                 'stop'    => "$r->[7] +0000");
@@ -1614,6 +1733,22 @@ $w->startTag('tv',
                 $w->emptyTag('icon', 'src' => $url);
               }
           }
+        # Get episode artwork. For movies allow any artwork if there is no decent artwork such as poster.
+        # For episodes if there is no decent images in EP then we try SH and finally any image from EP.
+        elsif (my ($artURI, $width, $height) = $SD->getEpisodeImageFromArtwork($artwork, $pID !~ /^EP/))
+          {
+            my $url = $SD->uriResolve($artURI, '/image');
+            if (defined($width) && defined($height))
+              {
+                $w->emptyTag('icon', 'src' => $url,
+                             'width' => $width,
+                             'height' => $height);
+              }
+            else
+              {
+                $w->emptyTag('icon', 'src' => $url);
+              }
+        }
         elsif (defined($supplementalDetails->{'episodeImage'}) &&
             defined($supplementalDetails->{'episodeImage'}->{'uri'}))
           {
@@ -1629,7 +1764,37 @@ $w->startTag('tv',
               {
                 $w->emptyTag('icon', 'src' => $url);
               }
+        }
+        elsif (my ($supArtURI, $supWidth, $supHeight) = $SD->getEpisodeImageFromArtwork($supArt, 1))
+          {
+            my $url = $SD->uriResolve($supArtURI, '/image');
+            if (defined($supWidth) && defined($supHeight))
+              {
+                $w->emptyTag('icon', 'src' => $url,
+                             'width' => $supWidth,
+                             'height' => $supHeight);
+              }
+            else
+              {
+                $w->emptyTag('icon', 'src' => $url);
+              }
           }
+        # And if no good EP image and no good SH image then try any EP image. This
+        # mostly picks up "Iconic" image.
+        elsif (($artURI, $width, $height) = $SD->getEpisodeImageFromArtwork($artwork, 1))
+          {
+            my $url = $SD->uriResolve($artURI, '/image');
+            if (defined($width) && defined($height))
+              {
+                $w->emptyTag('icon', 'src' => $url,
+                             'width' => $width,
+                             'height' => $height);
+              }
+            else
+              {
+                $w->emptyTag('icon', 'src' => $url);
+              }
+        }
 
         if (defined($programDetails->{'officialURL'}))
           {
@@ -3852,6 +4017,25 @@ sub DB_open
               }
             DB_settingsSet('version', $version);
             $DBH->commit();
+        }
+
+        if (2 == $version)
+          {
+              $version = 3;
+              print (STDERR "Updating database to version $version\n") if (!$quiet);
+                      $rc = $DBH->do("create table if not exists artwork ( " .
+                         "program varchar(128) not null primary key, " .
+                         "hash varchar(64) not null, " .
+                         "details blob not null) ");
+              if ((!defined($rc)) || ($rc < 0))
+                {
+                    print (STDERR "Unable to create schedules table in database $dbname: " . $DBH->errstr . "\n");
+                    $DBH->rollback();
+                    exit(1);
+                }
+
+              DB_settingsSet('version', $version);
+              $DBH->commit();
           }
 
         ##
@@ -4169,6 +4353,23 @@ sub DB_prune
         print (STDERR "Unable to prune programs no longer referenced in database: " . $sth->errstr . "\n");
       }
 
+    # Delete artwork no longer referenced
+    $sql = "delete from artwork where program not in (select distinct schedules.program from schedules as schedules) and program not in (select distinct p2.program_supplemental from programs as p2 where p2.program_supplemental is not null)";
+    $sth = $DBH->prepare_cached($sql);
+    if (!defined($sth))
+      {
+        print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+        exit(1);
+      }
+    $sth->execute();
+    if ($sth->err)
+      {
+        print (STDERR "Unable to prune artwork no longer referenced in database: " . $sth->errstr . "\n");
+      }
+    elsif ($sth->rows)
+      {
+          print (STDERR "Number of artwork pruned: " . $sth->rows . "\n");
+      }
     # Update programs which have a downloaded data in the future (bad rtc?)
     # (this should force a refresh of any supplemental programs downloaded with bad dates)
     $sql = "update programs set downloaded = '1970-01-01 00:00:00' where downloaded > ?";
@@ -4305,6 +4506,13 @@ sub DB_clean
     if ((!defined($rc)) || ($rc < 0))
       {
         print (STDERR "Unable to delete programs in database: " . $DBH->errstr . "\n");
+        exit(1);
+    }
+    $sql = "delete from artwork";
+    $rc = $DBH->do($sql);
+    if ((!defined($rc)) || ($rc < 0))
+      {
+        print (STDERR "Unable to delete artwork in database: " . $DBH->errstr . "\n");
         exit(1);
       }
     $DBH->commit();
@@ -5497,12 +5705,14 @@ package SchedulesDirect v20141201.0.0;
 # obtainDataLastUpdated        - return data last updated datetime
 # addLineup                    - add lineup to account
 # deleteLineup                 - delete lineup from account
+# getEpisodeImageFromArtwork   - return URI for episode from artwork
 # obtainLineups                - return lineups in account
 # obtainLineupMaps             - return maps for lineup
 # obtainHeadends               - return headends in country/postal
 # obtainStationsSchedules      - return stations schedules
 # obtainStationsSchedulesHash  - return stations schedules hash
 # obtainPrograms               - return program data for programs
+# obtainProgramsArtwork        - return artwork data for programs
 # obtainAvailable              - return available counties/satellites
 # deleteMessage                - delete message
 # uriResolve                   - convert uri to absolute
@@ -6618,13 +6828,13 @@ sub obtainHeadends
   }
 
 #
-# obtainPrograms
+# _obtainProgramsCommon
 #
-sub obtainPrograms
+sub _obtainProgramsCommon
   {
     my $self = shift;
-
-    print (STDERR "DEBUG: Entering " . (caller(0))[3] . " with args: \n" . Data::Dumper->new(\@_)->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
+    my $url = shift;
+    print (STDERR "DEBUG: Entering " . (caller(0))[3] . " with url: $url and args: \n" . Data::Dumper->new(\@_)->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
 
     my $return;
 
@@ -6654,7 +6864,7 @@ sub obtainPrograms
         return $return;
       }
 
-    my $request = HTTP::Request->new(POST => "$self->{'RESTUrl'}/programs");
+    my $request = HTTP::Request->new(POST => "$self->{'RESTUrl'}/$url");
 
     $request->header('Token' => "$self->{'_Token'}");
 
@@ -6713,6 +6923,29 @@ sub obtainPrograms
 
     print (STDERR "DEBUG: Returning from " . (caller(0))[3] . " with: \n" . Data::Dumper->new([$return])->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
     return $return;
+  }
+
+
+#
+# obtainPrograms
+#
+sub obtainPrograms
+  {
+    my $self = shift;
+
+    print (STDERR "DEBUG: Entering " . (caller(0))[3] . " with args: \n" . Data::Dumper->new(\@_)->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
+    return $self->_obtainProgramsCommon("programs", @_);
+  }
+
+#
+# obtainProgramsArtwork
+#
+sub obtainProgramsArtwork
+  {
+    my $self = shift;
+
+    print (STDERR "DEBUG: Entering " . (caller(0))[3] . " with args: \n" . Data::Dumper->new(\@_)->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
+    return $self->_obtainProgramsCommon("metadata/programs", @_);
   }
 
 #
@@ -7410,4 +7643,52 @@ sub _CroakOrCarp
     return;
   }
 
+# Try to get a decent image to use for the artwork.
+sub getEpisodeImageFromArtwork
+  {
+      my $self = shift;
+      print (STDERR "DEBUG: Entering " . (caller(0))[3] . "\n") if ($self->{'Debug'});
+      my ($art, $allowAnyArt) = @_;
+      return unless $art;
+      return unless $art->{data};
+      return unless ref($art->{data}) eq 'ARRAY';
+      # For the moment simply return the first match we find that
+      # exceeds the given width and is of an appropriate category
+      # since any art is better than no art. If $allowAnyArt then
+      # we allow any category of image.
+      for my $minWidth (900, 400, 200, 0) {
+          for my $d (@{$art->{data}}) {
+              next unless $d && $d->{category};
+              my $imgWidth = $d->{width};
+              # If we're size 0 it means we couldn't find a decent
+              # image so use any other images we can find such as
+              # cast images or Iconic images. Seems to happen on
+              # some daytime shows. We allow this as an option
+              # since on EP we don't want generic art but to use
+              # SH art instead; but for MV we are better using
+              # any art.
+              my $canUseImage = $minWidth == 0 && $allowAnyArt;
+              # Otherwise we're looking for a good high quality image.
+              if (!$canUseImage) {
+                  # https://github.com/SchedulesDirect/JSON-Service/wiki/API-20141201#field-meanings
+                  my $category = $d->{category};
+                  $canUseImage = $imgWidth > $minWidth &&
+                    ($category eq 'Poster Art' ||
+                     $category eq 'Box Art' ||
+                     $category eq 'VOD Art' ||
+                     $category eq 'Staple' ||
+                     $category =~ 'Banner-L' ||
+                     $category eq 'Logo');
+              }
+              if ($canUseImage)
+                {
+                    if ($d->{uri})
+                      {
+                          return ($d->{uri}, $d->{width}, $d->{height});
+                      }
+                }
+          }
+      }
+      return;
+  }
 1;
