@@ -50,3 +50,10 @@ Currently implemented fixups:
         by the xmltv provided values without further user interaction.
 
         Known apps: MythTV (feature request posted)
+
+    NO_3RD_PARTY_METADATA
+
+        Do not add the 3rd party metadata references (eg. TheTVDB) to the
+        generated results.  This is likely useful only when the app both
+        supports 3rd party metadata reference, and can accomplish a
+        better result using its own lookup frameworks/algorithms.
