@@ -246,6 +246,8 @@ my $JSON                       = JSON->new()->shrink(1)->utf8(1);
 
 my $SD = SchedulesDirect->new();
 
+my $CUSTOM_LINEUP_PREFIX       = 'CUSTOM-';
+
 my $DBH;                                       # DataBase Handle
 
 my $nowDateTime = DateTime->now( time_zone => 'UTC' );
@@ -318,7 +320,7 @@ if (defined($routeto))
       preferredmethod => 'allatonce',
       version => "$SCRIPT_VERSION",
       description => 'Multinational (Schedules Direct JSON web services with SQLite DB)',
-      extra_options => [qw/manage-lineups force-download download-only no-download passwordhash=s scale-download=f resturl=s routeto=s/],
+      extra_options => [qw/manage-lineups manage-custom-lineups force-download download-only no-download passwordhash=s scale-download=f resturl=s routeto=s/],
       defaults => { days => 30 },
     }
   );
@@ -338,6 +340,21 @@ $SD->Debug(1) if ($debug);
 if ($opt->{'manage-lineups'})
   {
     manageLineups();
+    exit(0);
+  }
+
+#
+# Special case for managing private lineups
+#
+# Custom lineups are an experimental feature
+# for special use cases for individuals who
+# need to combine multiple lineup channels
+# in non-standard ways.  The lineups to be
+# combined must be added first.
+#
+if ($opt->{'manage-custom-lineups'})
+  {
+    manageCustomLineups();
     exit(0);
   }
 
@@ -469,7 +486,7 @@ lineupValidate($conf->{'lineup'});
 # Get our current Schedules Direct maps (channels and
 # stations) for our lineup and feed to our DB if needed
 #
-for my $lineup(@{$conf->{'lineup'}})
+for my $lineup(@{obtainLineupMapsToFetch($conf->{'lineup'})})
   {
     if (SD_isLineupFetchRequired([$lineup]))
       {
@@ -489,7 +506,7 @@ for (my $retry = 0; $retry < 4; $retry++)
   {
     my $downloadRetry = 0;
 
-    $sql = 'select distinct stations.station from stations as stations where stations.station in (select distinct channels.station from channels as channels where channels.lineup in ( ' . join(', ', ('?') x scalar(@{$conf->{'lineup'}})) . ' ) and channels.selected = 1)';
+    $sql = 'select distinct stations.station from stations as stations where stations.station in (select distinct c1.station from channels as c1 where c1.lineup in ( ' . join(', ', ('?') x scalar(@{$conf->{'lineup'}})) . ' ) and c1.selected = 1) and stations.station in ( select distinct c2.station from channels as c2 where c2.lineup not like "' . $CUSTOM_LINEUP_PREFIX . '%" )';
 
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
@@ -638,7 +655,7 @@ for (my $retry = 0; $retry < 4; $retry++)
         #
         # Indicate we have downloaded the data
         #
-        $sql = 'update lineups set downloaded = ? where lineup in ( ' . join(', ', ('?') x scalar(@{$conf->{'lineup'}})) . ' )';
+        $sql = 'update lineups set downloaded = ? where lineup in ( ' . join(', ', ('?') x scalar(@{$conf->{'lineup'}})) . ' ) and lineup not like "' . $CUSTOM_LINEUP_PREFIX . '%"';
         $sth = $DBH->prepare_cached($sql);
         if (!defined($sth))
           {
@@ -2882,7 +2899,7 @@ sub listChannels
         # Get our current Schedules Direct maps (channels and
         # stations) for our lineup and feed to our DB if needed
         #
-        for my $lineup(@{$conf->{'lineup'}})
+        for my $lineup(@{obtainLineupMapsToFetch($conf->{'lineup'})})
           {
             if (SD_isLineupFetchRequired([$lineup]))
               {
@@ -3259,7 +3276,7 @@ sub getLineup
         # Get our current Schedules Direct maps (channels and
         # stations) for our lineup and feed to our DB if needed
         #
-        for my $lineup(@{$conf->{'lineup'}})
+        for my $lineup(@{obtainLineupMapsToFetch($conf->{'lineup'})})
           {
             if (SD_isLineupFetchRequired([$lineup]))
               {
@@ -3872,7 +3889,7 @@ sub SD_downloadLineups
     # Remove any lineups from our database not in our schedules direct account
     #
 
-    $sql2 = 'delete from lineups where lineup not in ( ' . join(', ', ('?') x scalar(@accountLineups)) . ' )';
+    $sql2 = 'delete from lineups where lineup not in ( ' . join(', ', ('?') x scalar(@accountLineups)) . ' ) and lineup not like "' . $CUSTOM_LINEUP_PREFIX . '%"';
 
     $sth2 = $DBH->prepare_cached($sql2);
     if (!defined($sth2))
@@ -4228,8 +4245,9 @@ sub lineupValidate
 
         if (!defined($llu))
           {
-            print (STDERR "Lineup $lineup is no longer configured in your account at Schedules Direct.\n");
+            print (STDERR "Lineup $lineup is no longer configured in your account at Schedules Direct or as a custom lineup.\n");
             print (STDERR "Please run $SCRIPT_NAME --manage-lineups to manage your Schedules Direct lineups,\n");
+            print (STDERR "and/or run $SCRIPT_NAME --manage-custom-lineups to manage your custom lineups,\n");
             print (STDERR "and/or $SCRIPT_NAME --configure to change the configured lineups.\n");
             $fatal = 1;
           }
@@ -4251,6 +4269,89 @@ sub lineupValidate
       {
         exit(1);
       }
+  }
+
+#
+# hasCustomLineup
+#
+# Convenience routine to check to see if the lineups
+# include a custom lineup
+#
+#   Input:
+#              lineup(s)   - Lineup(s) to validate
+#   Output:
+#              result      - true (custom lineup in array) or false
+#
+sub hasCustomLineup
+  {
+    my ($lineups, undef) = @_;
+
+    #
+    # search through lineups to see if any are custom
+    #
+    for my $lineup(@{$lineups})
+      {
+        if ($lineup =~ m/^$CUSTOM_LINEUP_PREFIX/)
+          {
+            return 1;
+          }
+      }
+
+      return 0;
+  }
+
+#
+#
+#
+sub obtainLineupMapsToFetch
+  {
+    my ($lineups, undef) = @_;
+
+    my $sql;
+    my $sth;
+    my $accountLineups = [];
+
+    for my $lineup(@{$lineups})
+      {
+        if ($lineup =~ m/^$CUSTOM_LINEUP_PREFIX/)
+          {
+            #
+            # We need to fetch all lineup maps which are not custom
+            #
+            $sql = 'select lineup from lineups where lineup not like "' . $CUSTOM_LINEUP_PREFIX . '%"';
+            $sth = $DBH->prepare_cached($sql);
+            if (!defined($sth))
+             {
+               print (STDERR "Unexpected error when preparing statement ($sql): " . $DBH->errstr . "\n");
+               exit(1);
+             }
+
+            $sth->execute();
+            if ($sth->err())
+              {
+                print (STDERR "Unexpected error when executing statement ($sql): " . $sth->errstr . "\n");
+                $DBH->rollback();
+                exit(1);
+              }
+
+            my $l = $sth->fetchall_arrayref([0]);
+            if ($sth->err())
+              {
+                print (STDERR "Unexpected error when executing fetch after execute of statement ($sql): " . $sth->errstr . "\n");
+                $DBH->rollback();
+                exit(1);
+              }
+
+            for my $lineup(@{$l})
+              {
+                push(@{$accountLineups}, $lineup->[0]);
+              }
+
+            return ($accountLineups);
+          }
+      }
+
+    return $lineups;
   }
 
 #
@@ -4881,7 +4982,7 @@ sub DB_prune
       }
 
     # Delete stations no longer in any of our channels
-    $sql = "delete from stations where station not in (select distinct channels.station from channels as channels)";
+    $sql = "delete from stations where station not in (select distinct channels.station from channels as channels where channels.lineup not like '" . $CUSTOM_LINEUP_PREFIX . "%')";
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
       {
@@ -5815,6 +5916,30 @@ sub manageLineups
               }
           }
       }
+    return;
+  }
+
+#
+# manageCustomLineups
+#
+# NOTE: This is an experimental feature to
+# allow individuals who need to combine lineups
+# in non-standard ways.  The base lineups must
+# already be in the individuals Schedules Direct
+# account lineup list.
+#
+#   Input:
+#              <none>
+#   Output:
+#              <none>
+#
+sub manageCustomLineups
+  {
+    DB_open($conf->{'database'}->[0]);
+
+    print (STDERR "Custom lineups is currently an experimental feature.\n");
+    print (STDERR "Management is not yet available\n");
+
     return;
   }
 
