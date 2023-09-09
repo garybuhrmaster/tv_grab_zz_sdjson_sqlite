@@ -4982,7 +4982,7 @@ sub DB_prune
       }
 
     # Delete stations no longer in any of our channels
-    $sql = "delete from stations where station not in (select distinct channels.station from channels as channels where channels.lineup not like '" . $CUSTOM_LINEUP_PREFIX . "%')";
+    $sql = "delete from stations where station not in (select distinct channels.station from channels as channels)";
     $sth = $DBH->prepare_cached($sql);
     if (!defined($sth))
       {
