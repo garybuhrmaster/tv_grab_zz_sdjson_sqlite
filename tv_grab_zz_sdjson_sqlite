@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2025/01/22 - 1.139 - add useragent option
 # 2025/01/16 - 1.138 - add deaf-signed subtitles element
 # 2024/08/02 - 1.137 - fix error handling in DB_open
 # 2024/01/27 - 1.136 - extend detail in schedules direct user-agent
@@ -233,7 +234,7 @@ my $RFC2838_COMPLIANT          = 1;            # RFC2838 compliant station ids, 
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_zz_sdjson_sqlite';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
-my $SCRIPT_VERSION             = '1.138';
+my $SCRIPT_VERSION             = '1.139';
 
 my $SCRIPT_DB_VERSION          = 2;            # Used for script/db updates (see DB_open)
 
@@ -281,6 +282,7 @@ my $passwordHash;
 
 my $resturl;
 my $routeto;
+my $useragent;
 
 my $opt;
 my $conf;
@@ -320,6 +322,19 @@ if (defined($routeto))
     $SD->RouteTo($routeto);
   }
 
+#
+# We attempt to pick off the --user-agent option due to
+# the XMLTV ParseOptions not allowing extra_options to be
+# processed in the configure stage.
+#
+Getopt::Long::Configure("pass_through");
+GetOptions('user-agent=s' => \$useragent);
+Getopt::Long::Configure("no_pass_through");
+if (defined($useragent))
+  {
+    $SD->UserAgent($useragent);
+  }
+
 ( $opt, $conf ) = ParseOptions
   (
     {
@@ -333,7 +348,7 @@ if (defined($routeto))
       preferredmethod => 'allatonce',
       version => "$SCRIPT_VERSION",
       description => 'Multinational (Schedules Direct JSON web services with SQLite DB)',
-      extra_options => [qw/manage-lineups force-download download-only no-download passwordhash=s scale-download=f resturl=s routeto=s/],
+      extra_options => [qw/manage-lineups force-download download-only no-download passwordhash=s scale-download=f resturl=s routeto=s user-agent=s/],
       defaults => { days => 30 },
     }
   );
@@ -7157,6 +7172,33 @@ sub RouteTo
       }
 
     $return = $self->{'RouteTo'};
+
+    print (STDERR "DEBUG: Returning from " . (caller(0))[3] . " with: \n" . Data::Dumper->new([$return])->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
+
+    return $return;
+  }
+
+#
+# set/return UserAgent
+#
+sub UserAgent
+  {
+    my $self = shift;
+
+    print (STDERR "DEBUG: Entering " . (caller(0))[3] . " with args: \n" . Data::Dumper->new(\@_)->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
+
+    my $return;
+
+    $self->_resetError;
+
+    if (@_)
+      {
+        $self->{'UserAgent'} = shift;
+        $self->{'_LWP'}->agent($self->{'UserAgent'});
+        $self->_resetSession;
+      }
+
+    $return = $self->{'UserAgent'};
 
     print (STDERR "DEBUG: Returning from " . (caller(0))[3] . " with: \n" . Data::Dumper->new([$return])->Pad('DEBUG:   ')->Useqq(1)->Dump) if ($self->{'Debug'});
 
