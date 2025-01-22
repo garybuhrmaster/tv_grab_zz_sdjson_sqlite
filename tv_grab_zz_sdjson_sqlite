@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2025/01/22 - 1.140 - add retriable http codes
 # 2025/01/22 - 1.139 - add useragent option
 # 2025/01/16 - 1.138 - add deaf-signed subtitles element
 # 2024/08/02 - 1.137 - fix error handling in DB_open
@@ -234,7 +235,7 @@ my $RFC2838_COMPLIANT          = 1;            # RFC2838 compliant station ids, 
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_zz_sdjson_sqlite';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
-my $SCRIPT_VERSION             = '1.139';
+my $SCRIPT_VERSION             = '1.140';
 
 my $SCRIPT_DB_VERSION          = 2;            # Used for script/db updates (see DB_open)
 
@@ -6799,6 +6800,13 @@ sub new
     $self->{'_LWP'} = LWP::UserAgent::Determined->new(agent => $self->{'UserAgent'},
                         conn_cache => LWP::ConnCache->new(total_capacity => $self->{'ConnCache'}));
     $self->{'_LWP'}->timing('1,2,5,10,20,20,20,20,20,20');
+    $self->{'_LWP'}->codes_to_determinate->{520} = 1;          # Add in some unofficial retriable codes
+    $self->{'_LWP'}->codes_to_determinate->{521} = 1;
+    $self->{'_LWP'}->codes_to_determinate->{522} = 1;
+    $self->{'_LWP'}->codes_to_determinate->{523} = 1;
+    $self->{'_LWP'}->codes_to_determinate->{524} = 1;
+    $self->{'_LWP'}->codes_to_determinate->{525} = 1;
+    $self->{'_LWP'}->codes_to_determinate->{529} = 1;
     $self->{'_LWP'}->requests_redirectable(['GET', 'HEAD', 'POST', 'PUT', 'DELETE']);
     $self->{'_LWP'}->default_header('Accept-Encoding' => scalar HTTP::Message::decodable(),
                                     'Accept' => 'application/json',
