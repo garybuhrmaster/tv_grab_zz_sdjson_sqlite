@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2025/10/25 - 1.141 - Update pod for user-agent
 # 2025/01/22 - 1.140 - add retriable http codes
 # 2025/01/22 - 1.139 - add useragent option
 # 2025/01/16 - 1.138 - add deaf-signed subtitles element
@@ -235,7 +236,7 @@ my $RFC2838_COMPLIANT          = 1;            # RFC2838 compliant station ids, 
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_zz_sdjson_sqlite';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
-my $SCRIPT_VERSION             = '1.140';
+my $SCRIPT_VERSION             = '1.141';
 
 my $SCRIPT_DB_VERSION          = 2;            # Used for script/db updates (see DB_open)
 
@@ -6409,27 +6410,34 @@ tv_grab_zz_sdjson_sqlite --capabilities
 tv_grab_zz_sdjson_sqlite --description
 
 tv_grab_zz_sdjson_sqlite --manage-lineups [--config-file FILE]
-              [--quiet] [--debug] [--passwordhash HASH]
+              [--quiet] [--debug]
+              [--passwordhash HASH] [--resturl URL] [--routeto ROUTETO]
+              [--user-agent USER-AGENT]
 
 tv_grab_zz_sdjson_sqlite [--days N] [--offset N] [--config-file FILE]
               [--output FILE] [--quiet] [--debug]
               [--passwordhash HASH] [--resturl URL] [--routeto ROUTETO]
+              [--user-agent USER-AGENT]
 
 tv_grab_zz_sdjson_sqlite --configure [--config-file FILE]
               [--quiet] [--debug]
               [--passwordhash HASH] [--resturl URL] [--routeto ROUTETO]
+              [--user-agent USER-AGENT]
 
 tv_grab_zz_sdjson_sqlite --list-channels [--config-file FILE]
               [--output FILE] [--quiet] [--debug]
               [--passwordhash HASH] [--resturl URL] [--routeto ROUTETO]
+              [--user-agent USER-AGENT]
 
 tv_grab_zz_sdjson_sqlite --list-lineups  [--config-file FILE]
               [--output FILE] [--quiet] [--debug]
               [--passwordhash HASH] [--resturl URL] [--routeto ROUTETO]
+              [--user-agent USER-AGENT]
 
 tv_grab_zz_sdjson_sqlite --get-lineup [--config-file FILE]
               [--output FILE] [--quiet] [--debug]
               [--passwordhash HASH] [--resturl URL] [--routeto ROUTETO]
+              [--user-agent USER-AGENT]
 
 =head1 DESCRIPTION
 
@@ -6516,6 +6524,10 @@ Schedules Direct staff.
 B<--routeto ROUTETO> Provide the Schedules Direct service endpoint
 RouteTo header.  This is primarily useful for testing when
 directed by Schedules Direct staff.
+
+B<--user-agent USER-AGENT> Provide the Schedules Direct service
+endpoint user-agent header.  This is primarily useful for testing
+when directed by Schedules Direct staff.
 
 B<--list-channels> Write output giving <channel> elements for every
 channel available in the current configuration.
