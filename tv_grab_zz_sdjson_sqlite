@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2025/11/17 - 1.142 - add initial "OTT" transport type support
 # 2025/10/25 - 1.141 - Update pod for user-agent
 # 2025/01/22 - 1.140 - add retriable http codes
 # 2025/01/22 - 1.139 - add useragent option
@@ -236,7 +237,7 @@ my $RFC2838_COMPLIANT          = 1;            # RFC2838 compliant station ids, 
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_zz_sdjson_sqlite';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
-my $SCRIPT_VERSION             = '1.141';
+my $SCRIPT_VERSION             = '1.142';
 
 my $SCRIPT_DB_VERSION          = 2;            # Used for script/db updates (see DB_open)
 
@@ -3601,7 +3602,7 @@ sub getLineup
 
                   $w->endTag('station');
 
-                  if (($SDtype eq 'Cable') || ($SDtype eq 'Satellite') || ($SDtype eq 'IPTV'))
+                  if (($SDtype eq 'Cable') || ($SDtype eq 'Satellite') || ($SDtype eq 'IPTV') || ($SDtype eq 'OTT'))
                     {
                       $w->startTag('stb-channel');
                       if (defined($c->{'channel'}) && looks_like_number($c->{'channel'}))
@@ -4208,7 +4209,8 @@ sub SD_downloadLineupMaps
             ($lineupTransport eq 'DVB-C') ||
             ($lineupTransport eq 'DVB-T') ||
             ($lineupTransport eq 'DVB-S') ||
-            ($lineupTransport eq 'IPTV'))
+            ($lineupTransport eq 'IPTV') ||
+            ($lineupTransport eq 'OTT') )
           {
             $channum = $c->{'channel'} if (defined($c->{'channel'}));
             $channum = 0 + $channum if (looks_like_number($channum));
@@ -6131,7 +6133,8 @@ sub mapTransport
         'Cable'          => 'STB',         # Cable (most use a STB?)
         'Antenna'        => 'DTV',         # Antenna (US ATSC and/or analog)
         'Satellite'      => 'STB',         # Satellite (most use a STB?)
-        'IPTV'           => 'STB'          # Schedules Direct IPTV is STB-like
+        'IPTV'           => 'STB',         # Schedules Direct IPTV is STB like
+        'OTT'            => 'STB'          # Schedules Direct OTT is STB like
       };
 
     if (defined($transportTypeMap->{$transport}))
