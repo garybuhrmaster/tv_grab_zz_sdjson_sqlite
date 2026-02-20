@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2026/02/18 - 1.143 - Force full download for script version changes
 # 2025/11/17 - 1.142 - add initial "OTT" transport type support
 # 2025/10/25 - 1.141 - Update pod for user-agent
 # 2025/01/22 - 1.140 - add retriable http codes
@@ -237,7 +238,7 @@ my $RFC2838_COMPLIANT          = 1;            # RFC2838 compliant station ids, 
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_zz_sdjson_sqlite';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
-my $SCRIPT_VERSION             = '1.142';
+my $SCRIPT_VERSION             = '1.143';
 
 my $SCRIPT_DB_VERSION          = 2;            # Used for script/db updates (see DB_open)
 
@@ -441,6 +442,20 @@ my $param4;
 #
 print (STDERR "Opening the local database\n") if (!$quiet);
 DB_open($conf->{'database'}->[0]);
+
+#
+# If the script version has changed, force a (mostly)
+# complete download by deleting most of the data in
+# the database, making this (in a effect) a "first
+# download".  If no-download was specified, skip the
+# the update (the results may be inconsistent/wrong)
+#
+if ($download && ((!defined(DB_settingsGet('script_version'))) || (DB_settingsGet('script_version') ne "$SCRIPT_VERSION")))
+  {
+    print (STDERR "   clearing existing database to force full download due to script version update\n") if (!$quiet);
+    DB_clean();
+    DB_settingsSet("script_version", "$SCRIPT_VERSION")
+  }
 
 #
 # Provide the ability to force a (mostly) complete download
@@ -2997,6 +3012,20 @@ sub listChannels
     print (STDERR "Opening the local database\n") if (!$quiet);
     DB_open($conf->{'database'}->[0]);
 
+    #
+    # If the script version has changed, force a (mostly)
+    # complete download by deleting most of the data in
+    # the database, making this (in a effect) a "first
+    # download".  If no-download was specified, skip the
+    # the update (the results may be inconsistent/wrong)
+    #
+    if ($download && ((!defined(DB_settingsGet('script_version'))) || (DB_settingsGet('script_version') ne "$SCRIPT_VERSION")))
+      {
+        print (STDERR "   clearing existing database to force full download due to script version update\n") if (!$quiet);
+        DB_clean();
+        DB_settingsSet("script_version", "$SCRIPT_VERSION")
+      }
+
     if ($opt->{'force-download'})
       {
         print (STDERR "   clearing existing database to force full download\n") if (!$quiet);
@@ -3237,6 +3266,20 @@ sub listLineups
     print (STDERR "Opening the local database\n") if (!$quiet);
     DB_open($conf->{'database'}->[0]);
 
+    #
+    # If the script version has changed, force a (mostly)
+    # complete download by deleting most of the data in
+    # the database, making this (in a effect) a "first
+    # download".  If no-download was specified, skip the
+    # the update (the results may be inconsistent/wrong)
+    #
+    if ($download && ((!defined(DB_settingsGet('script_version'))) || (DB_settingsGet('script_version') ne "$SCRIPT_VERSION")))
+      {
+        print (STDERR "   clearing existing database to force full download due to script version update\n") if (!$quiet);
+        DB_clean();
+        DB_settingsSet("script_version", "$SCRIPT_VERSION")
+      }
+
     if ($opt->{'force-download'})
       {
         print (STDERR "   clearing existing database to force full download\n") if (!$quiet);
@@ -3373,6 +3416,19 @@ sub getLineup
 
     print (STDERR "Opening the local database\n") if (!$quiet);
     DB_open($conf->{'database'}->[0]);
+
+    #
+    # If the script version has changed, force a (mostly)
+    # complete download by deleting most of the data in
+    # the database, making this (in a effect) a "first
+    # download"
+    #
+    if ($download && ((!defined(DB_settingsGet('script_version'))) || (DB_settingsGet('script_version') ne "$SCRIPT_VERSION")))
+      {
+        print (STDERR "   clearing existing database to force full download due to script version update\n") if (!$quiet);
+        DB_clean();
+        DB_settingsSet("script_version", "$SCRIPT_VERSION")
+      }
 
     if ($opt->{'force-download'})
       {
