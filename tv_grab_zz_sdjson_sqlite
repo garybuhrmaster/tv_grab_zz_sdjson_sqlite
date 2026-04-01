@@ -44,6 +44,7 @@
 #
 # Version history:
 #
+# 2026/04/01 = 1.144 - update cast and crew mappings
 # 2026/02/18 - 1.143 - Force full download for script version changes
 # 2025/11/17 - 1.142 - add initial "OTT" transport type support
 # 2025/10/25 - 1.141 - Update pod for user-agent
@@ -238,7 +239,7 @@ my $RFC2838_COMPLIANT          = 1;            # RFC2838 compliant station ids, 
 my $SCRIPT_URL                 = 'https://github.com/garybuhrmaster/tv_grab_zz_sdjson_sqlite';
 my $SCRIPT_NAME                = basename("$0");
 my $SCRIPT_NAME_DIR            = dirname("$0");
-my $SCRIPT_VERSION             = '1.143';
+my $SCRIPT_VERSION             = '1.144';
 
 my $SCRIPT_DB_VERSION          = 2;            # Used for script/db updates (see DB_open)
 
@@ -1381,6 +1382,7 @@ my $crewMap =
     'Story'                                => { 'role' => 'writer' },
     'Writer'                               => { 'role' => 'writer' },
     'Writer (Adaptation)'                  => { 'role' => 'writer' },
+    'Writer (Adaptation and Dialogue)'     => { 'role' => 'writer' },
     'Writer (Additional Dialogue)'         => { 'role' => 'writer' },
     'Writer (Autobiography)'               => { 'role' => 'writer' },
     'Writer (Book)'                        => { 'role' => 'writer' },
@@ -1406,6 +1408,7 @@ my $crewMap =
     'Writer (Script)'                      => { 'role' => 'writer' },
     'Writer (Short Story)'                 => { 'role' => 'writer' },
     'Writer (Stage Musical)'               => { 'role' => 'writer' },
+    'Writer (Staging)'                     => { 'role' => 'writer' },
     'Writer (Story)'                       => { 'role' => 'writer' },
     'Writer (Story and Screenplay)'        => { 'role' => 'writer' },
     'Writer (Teleplay)'                    => { 'role' => 'writer' },
@@ -1434,12 +1437,14 @@ my $crewMap =
     'Managing Technical Director'          => { 'role' => 'director' },
     'Musical Director'                     => { 'role' => 'director' },
     'Music Director'                       => { 'role' => 'director' },
+    'Production Director'                  => { 'role' => 'director' },
     'Recording Director'                   => { 'role' => 'director' },
     'Second Assistant Director'            => { 'role' => 'director' },
     'Second Second Assistant Director'     => { 'role' => 'director' },
     'Second Unit Director'                 => { 'role' => 'director' },
     'Senior Art Director'                  => { 'role' => 'director' },
     'Set Director'                         => { 'role' => 'director' },
+    'Sound Director'                       => { 'role' => 'director' },
     'Stunt Action Director'                => { 'role' => 'director' },
     'Supervising Art Direction'            => { 'role' => 'director' },
     'Third Assistant Director'             => { 'role' => 'director' },
@@ -1451,6 +1456,7 @@ my $crewMap =
     'Assistant Dialogue Editor'            => { 'role' => 'editor' },
     'Assistant Editor'                     => { 'role' => 'editor' },
     'Assistant Sound Editor'               => { 'role' => 'editor' },
+    'Associate Editor'                     => { 'role' => 'editor' },
     'Associate Film Editor'                => { 'role' => 'editor' },
     'Background Sound Editor'              => { 'role' => 'editor' },
     'Co-Editor'                            => { 'role' => 'editor' },
@@ -1477,6 +1483,7 @@ my $crewMap =
     'Consulting Producer'                  => { 'role' => 'producer' },
     'Coordinating Producer'                => { 'role' => 'producer' },
     'Co-Producer'                          => { 'role' => 'producer' },
+    'Creative Producer'                    => { 'role' => 'producer' },
     'Executive Co-Producer'                => { 'role' => 'producer' },
     'Executive in Charge of Production'    => { 'role' => 'producer' },
     'Executive Music Producer'             => { 'role' => 'producer' },
@@ -1522,6 +1529,7 @@ my $crewMap =
     'Associate Costume Designer'           => { 'role' => 'undefined' },
     'Associate Set Decorator'              => { 'role' => 'undefined' },
     'Athlete'                              => { 'role' => 'undefined' },
+    'Background'                           => { 'role' => 'undefined' },
     'Background Music'                     => { 'role' => 'undefined' },
     'Boom Operator'                        => { 'role' => 'undefined' },
     'Cameraman'                            => { 'role' => 'undefined' },
@@ -1531,9 +1539,11 @@ my $crewMap =
     'Chief Hair Stylist'                   => { 'role' => 'undefined' },
     'Chief Makeup Artist'                  => { 'role' => 'undefined' },
     'Choreographer'                        => { 'role' => 'undefined' },
+    'Choreography'                         => { 'role' => 'undefined' },
     'Cinematography'                       => { 'role' => 'undefined' },
     'Conductor'                            => { 'role' => 'undefined' },
     'Construction Coordinator'             => { 'role' => 'undefined' },
+    'Consultant'                           => { 'role' => 'undefined' },
     'Co-Production Designer'               => { 'role' => 'undefined' },
     'Costume Design'                       => { 'role' => 'undefined' },
     'Costume Designer'                     => { 'role' => 'undefined' },
@@ -1543,6 +1553,7 @@ my $crewMap =
     'Dialogue'                             => { 'role' => 'undefined' },
     'Executive Assistant'                  => { 'role' => 'undefined' },
     'Foley Artist'                         => { 'role' => 'undefined' },
+    'Foley Mixer'                          => { 'role' => 'undefined' },
     'Graphic Artist'                       => { 'role' => 'undefined' },
     'Graphic Design'                       => { 'role' => 'undefined' },
     'Graphic Designer'                     => { 'role' => 'undefined' },
@@ -1619,6 +1630,8 @@ my $crewMap =
     'Stunt Supervisor'                     => { 'role' => 'undefined' },
     'Stunts'                               => { 'role' => 'undefined' },
     'Supervising Animator'                 => { 'role' => 'undefined' },
+    'Technical Advisor'                    => { 'role' => 'undefined' },
+    'Technical Assistant'                  => { 'role' => 'undefined' },
     'Unit Manager'                         => { 'role' => 'undefined' },
     'Unit Production'                      => { 'role' => 'undefined' },
     'Unit Production Manager'              => { 'role' => 'undefined' },
